@@ -1,6 +1,8 @@
 'use client'
 
 import type { Contributor, Video } from '@/types'
+import type { Category } from '@/types'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -24,6 +26,13 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Card,
   CardContent,
   CardDescription,
@@ -34,6 +43,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import replacePng from '@/public/replace.png'
+import { getCategories } from '@/lib/db/client'
+import { uploadVideo } from '@/lib/video-actions'
 
 interface ProfileClientPageProps {
   contributor: Contributor
@@ -48,10 +59,113 @@ export function ProfileClientPage({
 }: ProfileClientPageProps) {
   const { signOut } = useAuth()
   const router = useRouter()
+  const [categories, setCategories] = useState<Category[]>([])
+  const [videoFile, setVideoFile] = useState<File | null>(null)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
 
   const handleLogout = async () => {
     await signOut()
     router.replace('/login')
+  }
+
+  useEffect(() => {
+    getCategories().then(setCategories)
+  }, [])
+
+  const createThumbnailFromVideo = async (file: File) => {
+    const videoElement = document.createElement('video')
+    const url = URL.createObjectURL(file)
+    videoElement.src = url
+    videoElement.muted = true
+    videoElement.playsInline = true
+
+    await new Promise<void>((resolve, reject) => {
+      videoElement.addEventListener('loadeddata', () => resolve(), {
+        once: true,
+      })
+      videoElement.addEventListener(
+        'error',
+        () => reject(new Error('Unable to load video for thumbnail.')),
+        { once: true }
+      )
+    })
+
+    videoElement.currentTime = Math.min(1, videoElement.duration / 2)
+    await new Promise<void>((resolve) => {
+      videoElement.addEventListener('seeked', () => resolve(), { once: true })
+    })
+
+    const canvas = document.createElement('canvas')
+    canvas.width = videoElement.videoWidth
+    canvas.height = videoElement.videoHeight
+    const context = canvas.getContext('2d')
+    if (!context) {
+      URL.revokeObjectURL(url)
+      throw new Error('Unable to create thumbnail.')
+    }
+
+    context.drawImage(videoElement, 0, 0, canvas.width, canvas.height)
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((result) => {
+        if (result) {
+          resolve(result)
+        } else {
+          reject(new Error('Thumbnail generation failed.'))
+        }
+      }, 'image/jpeg')
+    })
+
+    URL.revokeObjectURL(url)
+
+    return new File([blob], `${file.name}-thumbnail.jpg`, {
+      type: 'image/jpeg',
+    })
+  }
+
+  const handleUpload = async () => {
+    setUploadError(null)
+    setUploadSuccess(null)
+
+    if (!videoFile || !title || !categoryId) {
+      setUploadError('Please add a video, title, and category.')
+      return
+    }
+
+    setUploading(true)
+
+    try {
+      const thumbnailFile = await createThumbnailFromVideo(videoFile)
+      const { error } = await uploadVideo({
+        videoFile,
+        thumbnailFile,
+        title,
+        description,
+        categoryId,
+        contributor,
+      })
+
+      if (error) {
+        throw error
+      }
+
+      setUploadSuccess('Video uploaded successfully!')
+      setVideoFile(null)
+      setTitle('')
+      setDescription('')
+      setCategoryId('')
+      router.refresh()
+    } catch (err) {
+      console.error(err)
+      setUploadError('Upload failed. Please try again.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const totalViews = videos.reduce(
@@ -198,9 +312,68 @@ export function ProfileClientPage({
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <Dropzone className="w-full" />
-                    <Button className="w-full" disabled>
-                      Upload Video
+                    <Dropzone
+                      className="w-full"
+                      onDrop={(files) => setVideoFile(files[0] || null)}
+                      fileName={videoFile?.name || null}
+                      helperText="MP4 or MOV files work best."
+                      disabled={uploading}
+                    />
+                    <div className="space-y-3">
+                      <div className="grid gap-2">
+                        <Label htmlFor="title">Title</Label>
+                        <Input
+                          id="title"
+                          value={title}
+                          onChange={(event) => setTitle(event.target.value)}
+                          placeholder="Give your skill a title"
+                          disabled={uploading}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="description">Description</Label>
+                        <Input
+                          id="description"
+                          value={description}
+                          onChange={(event) =>
+                            setDescription(event.target.value)
+                          }
+                          placeholder="Describe what viewers will learn"
+                          disabled={uploading}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="category">Category</Label>
+                        <Select
+                          value={categoryId}
+                          onValueChange={setCategoryId}
+                          disabled={uploading}
+                        >
+                          <SelectTrigger id="category">
+                            <SelectValue placeholder="Choose a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {uploadError && (
+                      <p className="text-sm text-destructive">{uploadError}</p>
+                    )}
+                    {uploadSuccess && (
+                      <p className="text-sm text-primary">{uploadSuccess}</p>
+                    )}
+                    <Button
+                      className="w-full"
+                      onClick={handleUpload}
+                      disabled={uploading}
+                    >
+                      {uploading ? 'Uploading...' : 'Upload Video'}
                     </Button>
                   </CardContent>
                 </Card>
