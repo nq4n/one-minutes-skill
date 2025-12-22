@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // Define your protected routes here
 const protectedRoutes = [
-  '/profile',
   '/upload', // Example protected route
   '/settings', // Example protected route
 ];
