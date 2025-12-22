@@ -71,13 +71,31 @@ export default function UploadVideoPage() {
         .from('contributors')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (contributorResponse.error || !contributorResponse.data) {
-        throw new Error('Contributor profile not found.');
+      let contributorId = contributorResponse.data?.id;
+
+      if (!contributorId) {
+        const fallbackName = user.email?.split('@')[0] || 'Contributor';
+        const { data: newContributor, error: createError } =
+          await supabase
+            .from('contributors')
+            .insert({
+              user_id: user.id,
+              email: user.email,
+              name: fallbackName,
+              bio: '',
+              avatar_url: '',
+            })
+            .select('id')
+            .single();
+
+        if (createError || !newContributor) {
+          throw createError || new Error('Contributor profile not found.');
+        }
+
+        contributorId = newContributor.id;
       }
-
-      const contributorId = contributorResponse.data.id;
 
       // 1. Upload video file
       const videoFileName = `${user.id}/${uuidv4()}-${videoFile.name}`;
