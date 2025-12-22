@@ -8,10 +8,6 @@ import { ProfileClientPage } from '@/components/profile-client-page'
 
 export default async function MyProfilePage() {
   const cookieStore = await cookies()
-console.log(
-  'AUTH COOKIES:',
-  cookieStore.getAll().map(c => c.name)
-)
   const contributor = await getAuthenticatedContributor(cookieStore)
   if (!contributor) {
     redirect('/login')
