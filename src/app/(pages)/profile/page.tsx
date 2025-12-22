@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import {
   getAuthenticatedContributor,
@@ -7,17 +6,12 @@ import {
 import { ProfileClientPage } from '@/components/profile-client-page'
 
 export default async function MyProfilePage() {
-  const cookieStore = await cookies()
-  const contributor = await getAuthenticatedContributor(cookieStore)
+  const contributor = await getAuthenticatedContributor()
   if (!contributor) {
     redirect('/login')
   }
-  
-  
-  const videos = await getVideosByContributor(
-    cookieStore,
-    contributor.id
-  )
+
+  const videos = await getVideosByContributor(contributor.id)
 
   return (
     <ProfileClientPage
