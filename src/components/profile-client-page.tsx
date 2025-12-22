@@ -3,8 +3,7 @@
 import type { Contributor, Video } from '@/types'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
-import { Header } from '@/components/header'
-import { Footer } from '@/components/footer'
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import Image from 'next/image'
@@ -67,7 +66,6 @@ export function ProfileClientPage({
 
   return (
     <div className="flex min-h-screen w-full flex-col">
-      <Header />
 
       <main className="flex-1 bg-muted/20">
         <div className="container mx-auto max-w-5xl py-8">
@@ -268,8 +266,6 @@ export function ProfileClientPage({
           </Tabs>
         </div>
       </main>
-
-      <Footer />
     </div>
   )
 }
