@@ -19,7 +19,7 @@ export async function getAuthenticatedContributor(): Promise<Contributor | null>
   const { data, error } = await supabase
     .from("contributors")
     .select("*")
-    .eq("id", user.id)
+    .eq("user_id", user.id)
     .single()
 
   return error ? null : (data as Contributor)
