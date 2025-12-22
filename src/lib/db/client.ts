@@ -26,6 +26,9 @@ export async function getVideos(): Promise<Video[]> {
   return data.map(video => ({
     ...video,
     thumbnailUrl: video.thumbnail_url || GRADIENT_PLACEHOLDER,
+    views: video.views ?? 0,
+    likes: video.likes ?? 0,
+    comments: video.comments ?? [],
   }))
 }
 
@@ -47,6 +50,9 @@ export async function getVideoById(
     ...data,
     thumbnailUrl: data.thumbnail_url || GRADIENT_PLACEHOLDER,
     videoUrl: data.video_url,
+    views: data.views ?? 0,
+    likes: data.likes ?? 0,
+    comments: data.comments ?? [],
   }
 }
 
@@ -121,5 +127,8 @@ export async function getVideosByContributorId(
   return data.map(video => ({
     ...video,
     thumbnailUrl: video.thumbnail_url || GRADIENT_PLACEHOLDER,
+    views: video.views ?? 0,
+    likes: video.likes ?? 0,
+    comments: video.comments ?? [],
   }))
 }

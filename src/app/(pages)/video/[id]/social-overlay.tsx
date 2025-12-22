@@ -31,13 +31,28 @@ export default function SocialOverlay({
   const [visible, setVisible] = useState(true)
   const [likesCount, setLikesCount] = useState(video.likes); // State for likes
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!video.videoUrl) return;
-    const link = document.createElement('a');
-    link.href = video.videoUrl;
-    link.download = `${video.title || 'video'}.mp4`;
-    link.rel = 'noopener noreferrer';
-    link.click();
+
+    try {
+      const response = await fetch(video.videoUrl);
+      if (!response.ok) {
+        throw new Error('Failed to download video.');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${video.title || 'video'}.mp4`;
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading video:', error);
+    }
   };
 
   // AUTO HIDE CONTROLS WITH FADE

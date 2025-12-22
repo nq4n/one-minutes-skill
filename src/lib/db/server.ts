@@ -38,6 +38,9 @@ export async function getVideosByContributor(contributorId: string): Promise<Vid
   return (data as any[]).map((video) => ({
     ...video,
     thumbnailUrl: video.thumbnail_url || GRADIENT_PLACEHOLDER,
+    views: video.views ?? 0,
+    likes: video.likes ?? 0,
+    comments: video.comments ?? [],
   })) as Video[]
 }
 
@@ -63,6 +66,9 @@ export async function getSavedVideos(userId: string): Promise<Video[]> {
   return (videos as any[]).map((video) => ({
     ...video,
     thumbnailUrl: video.thumbnail_url || GRADIENT_PLACEHOLDER,
+    views: video.views ?? 0,
+    likes: video.likes ?? 0,
+    comments: video.comments ?? [],
   })) as Video[]
 }
 
@@ -76,6 +82,9 @@ export async function getVideoById(id: string): Promise<Video | null> {
     ...(data as any),
     thumbnailUrl: (data as any).thumbnail_url || GRADIENT_PLACEHOLDER,
     videoUrl: (data as any).video_url || "",
+    views: (data as any).views ?? 0,
+    likes: (data as any).likes ?? 0,
+    comments: (data as any).comments ?? [],
   } as Video
 }
 

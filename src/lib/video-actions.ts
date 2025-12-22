@@ -78,6 +78,9 @@ export async function uploadVideo({
       thumbnail_url,
       category_id: categoryId,
       contributor_id: contributor.id, // Associate video with the contributor
+      views: 0,
+      likes: 0,
+      comments: [],
     })
     .select()
     .single();

@@ -107,7 +107,7 @@ export function VideoCard({ video }: VideoCardProps) {
                 </div>
                 <div className="flex items-center gap-1">
                   <Heart className="h-4 w-4" />
-                  <span>{formatCount(video.likes?.length || 0)}</span>
+                  <span>{formatCount(video.likes ?? 0)}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <MessageCircle className="h-4 w-4" />
