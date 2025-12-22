@@ -1,5 +1,4 @@
 // src/app/(pages)/video/[id]/page.tsx
-import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getVideoById, getContributorById } from '@/lib/db/server'
 import { VideoPlayer } from '@/components/video-player'
@@ -13,16 +12,13 @@ import VideoInteractionWrapper from './video-interaction-wrapper'
 export default async function VideoPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  const cookieStore = await cookies()
-  const video = await getVideoById(cookieStore, params.id)
+  const { id } = await params
+  const video = await getVideoById(id)
   if (!video) notFound()
 
-  const creator = await getContributorById(
-    cookieStore,
-    video.contributor_id
-  )
+  const creator = await getContributorById(video.contributor_id)
 
   return (
     <main className="flex-1 py-6">
