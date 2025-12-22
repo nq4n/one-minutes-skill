@@ -14,22 +14,19 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet';
 import { useSavedVideos } from '@/hooks/use-saved-videos';
-import { getRecommendations } from '@/app/actions';
 import { VideoCard } from './video-card';
-import { getCategories, getVideos } from '@/lib/db/client'; // CORRECTED IMPORT
-import type { Category, Video } from '@/types';
+import { getVideos } from '@/lib/db/client'; // CORRECTED IMPORT
+import type { Video } from '@/types';
 
 export function Recommendations() {
   const { savedVideos } = useSavedVideos();
-  const [recommendations, setRecommendations] = useState<string[]>([]);
+  const [recommendations, setRecommendations] = useState<Video[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [allVideos, setAllVideos] = useState<Video[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     getVideos().then(setAllVideos);
-    getCategories().then(setCategories);
   }, []);
 
   const handleGetRecommendations = async () => {
@@ -44,16 +41,24 @@ export function Recommendations() {
     }
 
     try {
-      const userProfile = `The user has saved the following videos: ${savedVideos
-        .map((v) => v.title)
-        .join(', ')}.`;
+      const savedIds = new Set(savedVideos.map((video) => video.id));
+      const savedCategories = new Set(
+        savedVideos
+          .map((video) => video.category_id)
+          .filter((categoryId): categoryId is string => Boolean(categoryId))
+      );
 
-      const videoCategories = `Available categories: ${categories
-        .map((c) => c.name)
-        .join(', ')}.`;
+      const categoryMatches = allVideos.filter(
+        (video) =>
+          !savedIds.has(video.id) &&
+          (savedCategories.size === 0 || savedCategories.has(video.category_id))
+      );
 
-      const result = await getRecommendations(userProfile, videoCategories);
-      setRecommendations(result);
+      const pool = categoryMatches.length > 0 ? categoryMatches : allVideos;
+      const shuffled = [...pool].filter((video) => !savedIds.has(video.id));
+      shuffled.sort(() => Math.random() - 0.5);
+
+      setRecommendations(shuffled.slice(0, 4));
     } catch (e) {
       console.error(e);
       setError("Sorry, we couldn't generate recommendations at this time.");
@@ -61,10 +66,6 @@ export function Recommendations() {
       setIsLoading(false);
     }
   };
-
-  const recommendedVideos = allVideos.filter((video) =>
-    recommendations.includes(video.title)
-  );
 
   return (
     <Sheet>
@@ -99,16 +100,9 @@ export function Recommendations() {
           )}
           {!isLoading && !error && recommendations.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {recommendedVideos.length > 0 ? (
-                recommendedVideos.map((video) => (
-                  <VideoCard key={video.id} video={video} />
-                ))
-              ) : (
-                <p className="text-muted-foreground col-span-2 text-center">
-                  We couldn't find exact matches for our recommendations. Try
-                  regenerating!
-                </p>
-              )}
+              {recommendations.map((video) => (
+                <VideoCard key={video.id} video={video} />
+              ))}
             </div>
           )}
            {!isLoading && !error && recommendations.length === 0 && (

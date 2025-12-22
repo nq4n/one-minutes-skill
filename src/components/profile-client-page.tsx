@@ -57,7 +57,7 @@ export function ProfileClientPage({
   videos,
   isOwner = false,
 }: ProfileClientPageProps) {
-  const { signOut } = useAuth()
+  const { signOut, user } = useAuth()
   const router = useRouter()
   const [categories, setCategories] = useState<Category[]>([])
   const [videoFile, setVideoFile] = useState<File | null>(null)
@@ -148,6 +148,7 @@ export function ProfileClientPage({
         description,
         categoryId,
         contributor,
+        userId: user?.id,
       })
 
       if (error) {
