@@ -20,7 +20,7 @@ export interface Video {
   contributor_id: string;
   category_id: string;
   views: number;
-  likes: string[]; // Array of user IDs who liked the video
+  likes: number;
   comments: Comment[]; // Embedded comments
   'data-ai-hint'?: string;
 }

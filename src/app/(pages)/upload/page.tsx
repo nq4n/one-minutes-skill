@@ -137,6 +137,9 @@ export default function UploadVideoPage() {
         thumbnail_url: thumbnailUrl,
         external_links: externalLinks.filter(link => link.trim() !== ''),
         contributor_id: contributorId,
+        views: 0,
+        likes: 0,
+        comments: [],
         // category_id: 'some-default-category-id', // TODO: Add category selection
       });
 
