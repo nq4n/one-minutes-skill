@@ -6,7 +6,12 @@ import { useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { cn } from '@/lib/utils';
 
-interface DropzoneProps extends React.HTMLAttributes<HTMLDivElement> {}
+interface DropzoneProps extends React.HTMLAttributes<HTMLDivElement> {
+  onDrop?: (files: File[]) => void;
+  disabled?: boolean;
+  fileName?: string | null;
+  helperText?: string;
+}
 
 const baseStyle: React.CSSProperties = {
   flex: 1,
@@ -39,14 +44,20 @@ const rejectStyle: React.CSSProperties = {
 };
 
 
-export function Dropzone({ className }: DropzoneProps) {
+export function Dropzone({
+  className,
+  onDrop,
+  disabled = false,
+  fileName,
+  helperText,
+}: DropzoneProps) {
   const {
     getRootProps,
     getInputProps,
     isFocused,
     isDragAccept,
     isDragReject,
-  } = useDropzone({ accept: { 'video/*': [] }, disabled: true }); // Disabled for now
+  } = useDropzone({ accept: { 'video/*': [] }, disabled, onDrop });
 
   const style = useMemo(
     () => ({
@@ -63,8 +74,14 @@ export function Dropzone({ className }: DropzoneProps) {
       <div {...getRootProps({ style } as any)}>
         <input {...getInputProps()} />
         <UploadCloud className="h-10 w-10 mb-4 text-primary" />
-        <p className="text-center">Drag 'n' drop a video file here, or click to select a file</p>
-        <em className="text-sm">(This feature is not functional yet)</em>
+        <p className="text-center">
+          Drag 'n' drop a video file here, or click to select a file
+        </p>
+        {fileName ? (
+          <em className="text-sm text-primary">Selected: {fileName}</em>
+        ) : (
+          helperText && <em className="text-sm">{helperText}</em>
+        )}
       </div>
     </div>
   );

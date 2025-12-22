@@ -2,24 +2,20 @@
 
 import { openrouter } from '@/lib/ai/openrouter';
 
-export async function getTranscript(title: string, videoUrl: string) {
-  const stream = await openrouter.chat.completions.create({
-    model: 'mistralai/mistral-7b-instruct:free',
-    messages: [
-      {
-        role: 'system',
-        content:
-          "You are an expert video transcriber. You will be given a video title. Your task is to generate an accurate and readable transcript of the video's audio content. For now, since you can't watch the video, create a plausible simulated transcript based on the title.",
-      },
-      {
-        role: 'user',
-        content: `Video Title: ${title}`,
-      },
-    ],
-    stream: true,
+export async function getTranscript(formData: FormData) {
+  const file = formData.get('file');
+
+  if (!file || !(file instanceof File)) {
+    throw new Error('Audio file is required for transcription.');
+  }
+
+  const transcription = await openrouter.audio.transcriptions.create({
+    file,
+    model: 'openai/whisper-1',
+    response_format: 'text',
   });
 
-  return stream;
+  return transcription.text;
 }
 
 export async function getAnswer(

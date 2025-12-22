@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getVideosByContributor, getContributorById } from '@/lib/db/server';
 import { notFound } from 'next/navigation';
 import { User } from 'lucide-react';
-import { VideoQuestionAnswer } from '@/components/video-q-and-a';
+import { VideoChat } from '@/components/video-chat';
 import { Separator } from '@/components/ui/separator';
 import { cookies } from 'next/headers';
 
@@ -58,7 +58,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             {contributorVideos.length > 0 && (
               <>
                 <Separator className="my-12" />
-                <VideoQuestionAnswer videos={contributorVideos} />
+                <VideoChat video={contributorVideos[0]} />
               </>
             )}
 

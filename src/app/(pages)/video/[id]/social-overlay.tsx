@@ -31,6 +31,15 @@ export default function SocialOverlay({
   const [visible, setVisible] = useState(true)
   const [likesCount, setLikesCount] = useState(video.likes); // State for likes
 
+  const handleDownload = () => {
+    if (!video.videoUrl) return;
+    const link = document.createElement('a');
+    link.href = video.videoUrl;
+    link.download = `${video.title || 'video'}.mp4`;
+    link.rel = 'noopener noreferrer';
+    link.click();
+  };
+
   // AUTO HIDE CONTROLS WITH FADE
   useEffect(() => {
     if (open) return
@@ -87,7 +96,7 @@ export default function SocialOverlay({
         </Icon>
 
         {/* DOWNLOAD */}
-        <Icon>
+        <Icon onClick={handleDownload}>
           <Download />
         </Icon>
 
