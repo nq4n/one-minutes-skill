@@ -87,3 +87,39 @@ export async function getContributorById(
 
   return data
 }
+
+export async function getContributorByUserId(
+  userId: string
+): Promise<Contributor | null> {
+  const { data, error } = await supabase
+    .from('contributors')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+
+  if (error || !data) {
+    console.error('getContributorByUserId error:', error)
+    return null
+  }
+
+  return data
+}
+
+export async function getVideosByContributorId(
+  contributorId: string
+): Promise<Video[]> {
+  const { data, error } = await supabase
+    .from('videos')
+    .select('*')
+    .eq('contributor_id', contributorId)
+
+  if (error || !data) {
+    console.error('getVideosByContributorId error:', error)
+    return []
+  }
+
+  return data.map(video => ({
+    ...video,
+    thumbnailUrl: video.thumbnail_url || GRADIENT_PLACEHOLDER,
+  }))
+}
