@@ -1,5 +1,5 @@
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase/client';
 import type { Contributor, Video } from '@/types';
 
 interface UploadVideoParams {
@@ -9,6 +9,7 @@ interface UploadVideoParams {
   description: string;
   categoryId: string;
   contributor: Contributor;
+  userId?: string;
 }
 
 /**
@@ -25,17 +26,17 @@ export async function uploadVideo({
   description,
   categoryId,
   contributor,
+  userId,
 }: UploadVideoParams): Promise<{ data: Video | null; error: any }> {
-  const supabase = createClientComponentClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const resolvedUserId = userId ?? (await supabase.auth.getUser()).data.user?.id;
 
-  if (!user) {
+  if (!resolvedUserId) {
     return { data: null, error: 'User not authenticated for upload.' };
   }
 
   // Create unique, user-specific file paths
-  const videoFilePath = `${user.id}/${Date.now()}_${videoFile.name}`;
-  const thumbnailFilePath = `${user.id}/${Date.now()}_${thumbnailFile.name}`;
+  const videoFilePath = `${resolvedUserId}/${Date.now()}_${videoFile.name}`;
+  const thumbnailFilePath = `${resolvedUserId}/${Date.now()}_${thumbnailFile.name}`;
 
   // 1. Upload video file
   const { data: videoUploadData, error: videoUploadError } = await supabase.storage
@@ -78,6 +79,9 @@ export async function uploadVideo({
       thumbnail_url,
       category_id: categoryId,
       contributor_id: contributor.id, // Associate video with the contributor
+      views: 0,
+      likes: 0,
+      comments: [],
     })
     .select()
     .single();

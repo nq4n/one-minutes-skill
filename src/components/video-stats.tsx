@@ -28,7 +28,7 @@ export function VideoStats({ video }: VideoStatsProps) {
       </div>
       <div className="flex items-center gap-2 text-muted-foreground">
         <MessageCircle className="h-5 w-5" />
-        <span>{formatCount(video.comments.length)} comments</span>
+        <span>{formatCount(video.comments?.length ?? 0)} comments</span>
       </div>
       <Button
         variant="outline"
@@ -42,7 +42,7 @@ export function VideoStats({ video }: VideoStatsProps) {
             saved && 'fill-accent'
           )}
         />
-        {formatCount(video.likes.length)}
+        {formatCount(video.likes ?? 0)}
       </Button>
     </div>
   );

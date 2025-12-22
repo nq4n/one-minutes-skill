@@ -1,12 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Video } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Download, FileText, Loader2 } from 'lucide-react';
+import { Download, FileText, Loader2, Mic } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
-import { getTranscript } from '@/app/actions';
 
 interface VideoTranscriptProps {
   video: Video;
@@ -17,126 +16,84 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const transcriptFileName = useMemo(() => {
     const safeTitle = video.title?.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
     return `${safeTitle || 'video'}-transcript.txt`;
   }, [video.title]);
 
-  const extractAudioFromVideo = async (videoUrl: string) => {
-    const videoElement = document.createElement('video');
-    videoElement.src = videoUrl;
-    videoElement.crossOrigin = 'anonymous';
-    videoElement.preload = 'auto';
-    videoElement.muted = true;
-    videoElement.playsInline = true;
-    videoElement.style.position = 'fixed';
-    videoElement.style.left = '-9999px';
-    document.body.appendChild(videoElement);
-
-    const stream = await new Promise<MediaStream>((resolve, reject) => {
-      const handleError = () => reject(new Error('Unable to load video.'));
-      videoElement.addEventListener('error', handleError, { once: true });
-      videoElement.addEventListener(
-        'loadedmetadata',
-        () => {
-          const capture =
-            (videoElement as HTMLVideoElement & {
-              captureStream?: () => MediaStream;
-              mozCaptureStream?: () => MediaStream;
-            }).captureStream?.() ||
-            (videoElement as HTMLVideoElement & {
-              mozCaptureStream?: () => MediaStream;
-            }).mozCaptureStream?.();
-
-          if (!capture) {
-            reject(new Error('Audio capture is not supported in this browser.'));
-            return;
-          }
-
-          resolve(capture);
-        },
-        { once: true }
-      );
-    });
-
-    const audioTracks = stream.getAudioTracks();
-    if (audioTracks.length === 0) {
-      throw new Error('No audio track found in this video.');
-    }
-
-    const audioStream = new MediaStream(audioTracks);
-    const recorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
-    const chunks: Blob[] = [];
-
-    const audioBlob = await new Promise<Blob>((resolve, reject) => {
-      const cleanup = () => {
-        videoElement.pause();
-        videoElement.remove();
-      };
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-        }
-      };
-
-      recorder.onerror = () => {
-        cleanup();
-        reject(new Error('Failed to record audio.'));
-      };
-
-      recorder.onstop = () => {
-        cleanup();
-        resolve(new Blob(chunks, { type: recorder.mimeType }));
-      };
-
-      videoElement.onended = () => {
-        if (recorder.state !== 'inactive') {
-          recorder.stop();
-        }
-      };
-
-      recorder.start();
-      videoElement
-        .play()
-        .catch(() => {
-          cleanup();
-          reject(new Error('Unable to play video for capture.'));
-        });
-    });
-
-    return new File([audioBlob], `${video.id}-audio.webm`, {
-      type: audioBlob.type || 'audio/webm',
-    });
-  };
-
   const handleGenerateTranscript = async () => {
     setIsLoading(true);
     setError(null);
     setTranscript('');
-    setStatus('Extracting audio from the video...');
+    setStatus('Listening for speech locally...');
 
     try {
-      if (!video.videoUrl) {
-        throw new Error('Video URL not available.');
+      if (typeof window === 'undefined') {
+        throw new Error('Speech recognition is only available in the browser.');
       }
 
-      const audioFile = await extractAudioFromVideo(video.videoUrl);
-      setStatus('Transcribing audio with AI...');
+      const SpeechRecognition =
+        window.SpeechRecognition ||
+        (window as Window & typeof globalThis & { webkitSpeechRecognition?: typeof SpeechRecognition })
+          .webkitSpeechRecognition;
 
-      const formData = new FormData();
-      formData.append('file', audioFile);
-      const result = await getTranscript(formData);
-      setTranscript(result || '');
-      setStatus(null);
+      if (!SpeechRecognition) {
+        throw new Error('Speech recognition is not supported in this browser.');
+      }
+
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0]?.transcript ?? '';
+          } else {
+            interimTranscript += result[0]?.transcript ?? '';
+          }
+        }
+
+        setTranscript((prev) => {
+          const base = prev.replace(/\s+/g, ' ').trim();
+          const next = `${base} ${finalTranscript}`.trim();
+          return interimTranscript ? `${next} ${interimTranscript}`.trim() : next;
+        });
+      };
+
+      recognition.onerror = () => {
+        setError('Speech recognition failed. Please try again.');
+        setStatus(null);
+        setIsLoading(false);
+      };
+
+      recognition.onend = () => {
+        setStatus(null);
+        setIsLoading(false);
+      };
+
+      recognition.start();
     } catch (e) {
       console.error(e);
       setError('Failed to generate transcript. Please try again.');
       setStatus(null);
-    } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStopTranscript = () => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setStatus(null);
+    setIsLoading(false);
   };
 
   const handleDownloadTranscript = () => {
@@ -177,18 +134,29 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
               Generate Video Transcript
             </h3>
             <p className="mb-4 text-muted-foreground">
-              Click the button to get a text version of the video's audio.
+              Use your device's speech recognition to generate a transcript
+              locally.
             </p>
-            <Button onClick={handleGenerateTranscript} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                'Generate Transcript'
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button onClick={handleGenerateTranscript} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Listening...
+                  </>
+                ) : (
+                  <>
+                    <Mic className="mr-2 h-4 w-4" />
+                    Start Transcript
+                  </>
+                )}
+              </Button>
+              {isLoading && (
+                <Button variant="outline" onClick={handleStopTranscript}>
+                  Stop
+                </Button>
               )}
-            </Button>
+            </div>
             {status && !error && (
               <p className="mt-3 text-sm text-muted-foreground">{status}</p>
             )}
