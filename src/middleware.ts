@@ -15,29 +15,24 @@ export async function middleware(request: NextRequest) {
 
   // If the path is in the protected routes list
   if (protectedRoutes.some(route => pathname.startsWith(route))) {
-    // In a pure CSR auth setup, the server doesn't know the auth state.
-    // It's safer to redirect to login and let the client-side AuthGuard
-    // determine the actual auth status and navigate if logged in.
-    // This prevents direct access to protected routes if a user tries to bypass client-side checks.
-    // The client-side AuthGuard on /profile will then redirect back if not logged in.
-    // This might cause a brief double-redirect but ensures server-side protection.
-    
-    // To minimize server roundtrips, we might check for a very basic auth cookie presence
-    // but the most reliable way to avoid the SSR auth issue is to delegate full auth check to client.
-    
-    // For this CSR strategy, we'll redirect to login and let client AuthGuard handle it.
-    // This means anyone directly navigating to /profile will briefly see /login before
-    // AuthGuard kicks in and potentially redirects them back to /profile if they are logged in.
-    
-    // You could optionally add a very basic cookie check here if you ONLY want to redirect if NO cookie exists at all.
-    // const hasAuthCookie = request.cookies.has('sb-tzdhnkscbtwpwsgabvit-auth-token'); // Replace with your actual project ID
-    // if (!hasAuthCookie) {
-    //   return NextResponse.redirect(new URL('/login', request.url));
-    // }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const projectRef = supabaseUrl
+      ? new URL(supabaseUrl).hostname.split('.')[0]
+      : null
+    const cookiePrefix = projectRef ? `sb-${projectRef}-auth-token` : null
+    const hasAuthCookie = cookiePrefix
+      ? request.cookies.has(cookiePrefix) ||
+        request.cookies.has(`${cookiePrefix}.0`) ||
+        request.cookies
+          .getAll()
+          .some(cookie => cookie.name.startsWith(cookiePrefix))
+      : request.cookies
+          .getAll()
+          .some(cookie => cookie.name.includes('auth-token'))
 
-    // Simpler: just redirect if it's a protected route. AuthGuard on client will sort it out.
-    // This is a "fail-safe" for direct server navigation to protected routes.
-    return NextResponse.redirect(new URL('/login', request.url));
+    if (!hasAuthCookie) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
   }
 
   return NextResponse.next()
