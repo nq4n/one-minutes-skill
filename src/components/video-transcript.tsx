@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Video } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +17,7 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const statusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const transcriptFileName = useMemo(() => {
     const safeTitle = video.title?.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
@@ -27,39 +28,57 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
     setIsLoading(true);
     setError(null);
     setTranscript('');
-    setStatus('Preparing video for transcription...');
+    setStatus('Downloading on server...');
 
     try {
       if (!video.videoUrl) {
         throw new Error('Video source is not available for transcription.');
       }
 
-      setStatus('Downloading video audio...');
-      const response = await fetch(video.videoUrl);
-
-      if (!response.ok) {
-        throw new Error('Failed to download the video.');
-      }
-
-      const blob = await response.blob();
-      const file = new File([blob], `${video.title || 'video'}.mp4`, {
-        type: blob.type || 'video/mp4',
-      });
-      const formData = new FormData();
-      formData.append('file', file);
-
-      setStatus('Transcribing audio...');
-      const transcription = await getTranscript(formData);
+      const transcription = await getTranscript(video.videoUrl);
       setTranscript(transcription);
       setStatus(null);
     } catch (e) {
       console.error(e);
-      setError('Failed to extract the transcript. Please try again.');
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Failed to extract the transcript. Please try again.'
+      );
       setStatus(null);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (statusIntervalRef.current) {
+        clearInterval(statusIntervalRef.current);
+        statusIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const steps = [
+      'Downloading on server...',
+      'Extracting audio...',
+      'Transcribing...',
+    ];
+    let index = 0;
+    setStatus(steps[index]);
+    statusIntervalRef.current = setInterval(() => {
+      index = (index + 1) % steps.length;
+      setStatus(steps[index]);
+    }, 3500);
+
+    return () => {
+      if (statusIntervalRef.current) {
+        clearInterval(statusIntervalRef.current);
+        statusIntervalRef.current = null;
+      }
+    };
+  }, [isLoading]);
 
   const handleDownloadTranscript = () => {
     const blob = new Blob([transcript], { type: 'text/plain;charset=utf-8' });
