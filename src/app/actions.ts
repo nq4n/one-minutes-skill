@@ -30,12 +30,18 @@ async function createTranscription(filePath: string) {
       typeof (error as { status?: number }).status === 'number'
         ? (error as { status: number }).status
         : undefined;
-    if (status === 405 && openaiFallback) {
-      return await openaiFallback.audio.transcriptions.create({
-        file: createReadStream(filePath),
-        model: 'whisper-1',
-        response_format: 'text',
-      });
+    if (openaiFallback) {
+      try {
+        return await openaiFallback.audio.transcriptions.create({
+          file: createReadStream(filePath),
+          model: 'whisper-1',
+          response_format: 'text',
+        });
+      } catch (fallbackError) {
+        throw new Error('Transcription request failed.', {
+          cause: fallbackError,
+        });
+      }
     }
     throw error;
   }
@@ -156,9 +162,11 @@ export async function getTranscript(videoUrl: string): Promise<string> {
     const friendlyMessage =
       status === 401 || status === 403
         ? 'Transcription service authentication failed.'
-        : status === 405
-          ? 'Transcription service rejected the request.'
-          : 'Failed to extract the transcript.';
+        : status === 400
+          ? 'Transcription request was invalid.'
+          : status === 405
+            ? 'Transcription service rejected the request.'
+            : 'Failed to extract the transcript.';
     if (error instanceof Error) {
       throw new Error(friendlyMessage, { cause: error });
     }
