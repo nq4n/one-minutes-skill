@@ -67,10 +67,10 @@ export async function getRecommendations(
     ],
     response_format: { type: 'json_object' },
   });
+
   const textResponse = completion.choices[0].message.content;
-  if (!textResponse) {
-    throw new Error('No response from AI');
-  }
+  if (!textResponse) throw new Error('No response from AI');
+
   try {
     const jsonResponse = JSON.parse(textResponse);
     return jsonResponse.recommendations || [];

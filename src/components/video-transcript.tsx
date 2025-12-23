@@ -12,7 +12,9 @@ interface VideoTranscriptProps {
 }
 
 export function VideoTranscript({ video }: VideoTranscriptProps) {
-  const [transcript, setTranscript] = useState('');
+  const [transcript, setTranscript] = useState(() =>
+    typeof video.transcript === 'string' ? video.transcript.trim() : ''
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
