@@ -1,18 +1,31 @@
 // src/app/(pages)/video/[id]/page.tsx
 import { notFound } from 'next/navigation'
 import { getVideoById, getContributorById } from '@/lib/db/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { VideoPlayer } from '@/components/video-player'
 import VideoInteractionWrapper from './video-interaction-wrapper'
 export default async function VideoPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  const { id } = params
+  const { id } = await params
   const video = await getVideoById(id)
   if (!video) notFound()
 
   const creator = await getContributorById(video.contributor_id)
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const { data: bookmark } = user
+    ? await supabase
+        .from('video_bookmarks')
+        .select('id')
+        .eq('video_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+    : { data: null }
 
   return (
     <main className="flex-1 py-6">
@@ -23,15 +36,9 @@ export default async function VideoPage({
             video={video}
             comments={video.comments}
             creator={creator}
+            isBookmarked={Boolean(bookmark)}
+            isAuthenticated={Boolean(user)}
           />
-        </div>
-        <div className="mt-4">
-          <h1 className="text-xl font-bold">{video.title}</h1>
-          {video.description && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              {video.description}
-            </p>
-          )}
         </div>
       </div>
     </main>
