@@ -6,14 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Download, FileText, Loader2 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
-import { getTranscript } from '@/app/actions';
+import { getOrCreateTranscript } from '@/app/actions';
 
 interface VideoTranscriptProps {
   video: Video;
 }
 
 export function VideoTranscript({ video }: VideoTranscriptProps) {
-  const [transcript, setTranscript] = useState('');
+  const [transcript, setTranscript] = useState(() =>
+    typeof video.transcript === 'string' ? video.transcript.trim() : ''
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -31,11 +33,14 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
     setStatus('Downloading on server...');
 
     try {
-      if (!video.videoUrl) {
+      if (!video.videoUrl || !video.id) {
         throw new Error('Video source is not available for transcription.');
       }
 
-      const transcription = await getTranscript(video.videoUrl);
+      const transcription = await getOrCreateTranscript(
+        video.id,
+        video.videoUrl
+      );
       setTranscript(transcription);
       setStatus(null);
     } catch (e) {
@@ -50,6 +55,15 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    setTranscript(
+      typeof video.transcript === 'string' ? video.transcript.trim() : ''
+    );
+    setIsLoading(false);
+    setError(null);
+    setStatus(null);
+  }, [video.id, video.transcript]);
 
   useEffect(() => {
     if (!isLoading) {
