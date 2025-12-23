@@ -126,10 +126,20 @@ export async function getTranscript(videoUrl: string): Promise<string> {
     return transcriptText;
   } catch (error) {
     console.error(error);
+    const status =
+      typeof (error as { status?: number }).status === 'number'
+        ? (error as { status: number }).status
+        : undefined;
+    const friendlyMessage =
+      status === 401 || status === 403
+        ? 'Transcription service authentication failed.'
+        : status === 405
+          ? 'Transcription service rejected the request.'
+          : 'Failed to extract the transcript.';
     if (error instanceof Error) {
-      throw new Error(error.message, { cause: error });
+      throw new Error(friendlyMessage, { cause: error });
     }
-    throw new Error('Failed to extract the transcript.', { cause: error });
+    throw new Error(friendlyMessage, { cause: error });
   } finally {
     await Promise.all([
       unlink(videoPath).catch(() => undefined),
