@@ -2,115 +2,97 @@
 
 import { openrouter } from '@/lib/ai/openrouter';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { randomUUID } from 'crypto';
-import { createReadStream, createWriteStream } from 'fs';
-import { unlink } from 'fs/promises';
-import { tmpdir } from 'os';
-import path from 'path';
-import { pipeline } from 'stream/promises';
-import { Readable } from 'stream';
-import { spawn } from 'child_process';
-import ffmpegPath from 'ffmpeg-static';
+
 import OpenAI from 'openai';
+import { randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
+import { Readable } from 'node:stream';
+import { spawn } from 'node:child_process';
+
+import ffmpegPath from 'ffmpeg-static';
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
-const openaiClient = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
 
-async function createTranscription(filePath: string) {
-  let openaiError: unknown;
-  if (openaiClient) {
-    try {
-      return await openaiClient.audio.transcriptions.create({
-        file: createReadStream(filePath),
-        model: 'whisper-1',
-        response_format: 'text',
-      });
-    } catch (error) {
-      openaiError = error;
-    }
+const openai =
+  process.env.OPENAI_API_KEY?.trim()
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    : null;
+
+/* ----------------------------- Helpers ----------------------------- */
+
+function isHttpUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
+function asTranscriptText(result: unknown): string {
+  // OpenAI SDK returns string for response_format:'text' OR an object in some wrappers
+  if (typeof result === 'string') return result.trim();
+
+  if (result && typeof result === 'object') {
+    const anyRes = result as any;
+    const text = anyRes.text ?? anyRes.transcription ?? anyRes.data?.text;
+    if (typeof text === 'string') return text.trim();
   }
 
-  try {
-    return await openrouter.audio.transcriptions.create({
-      file: createReadStream(filePath),
-      model: 'openai/whisper-1',
-      response_format: 'text',
-    });
-  } catch (error) {
-    const status =
-      typeof (error as { status?: number }).status === 'number'
-        ? (error as { status: number }).status
-        : undefined;
-    if (!openaiClient && status === 405) {
-      throw new Error(
-        'Transcription is unavailable with OpenRouter. Set OPENAI_API_KEY to enable transcription.',
-        { cause: error }
-      );
-    }
-    throw new Error('Transcription request failed.', {
-      cause: openaiError ?? error,
-    });
-  }
+  return '';
 }
 
 async function maybeCreateSignedSupabaseUrl(url: string) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   if (!supabaseUrl) return url;
 
-  if (!url.startsWith(`${supabaseUrl}/storage/v1/object/`)) {
-    return url;
-  }
+  // Only sign URLs coming from THIS Supabase storage
+  if (!url.startsWith(`${supabaseUrl}/storage/v1/object/`)) return url;
 
-  if (url.includes('/storage/v1/object/sign/')) {
-    return url;
-  }
+  // Already signed
+  if (url.includes('/storage/v1/object/sign/')) return url;
 
+  // Convert URL -> bucket + objectPath
   const storagePath = url.replace(`${supabaseUrl}/storage/v1/object/`, '');
-  const withoutPublic = storagePath.startsWith('public/')
-    ? storagePath.replace('public/', '')
+  const cleaned = storagePath.startsWith('public/')
+    ? storagePath.slice('public/'.length)
     : storagePath;
-  const [bucket, ...pathParts] = withoutPublic.split('/');
-  const objectPath = pathParts.join('/');
 
-  if (!bucket || !objectPath) {
-    return url;
-  }
+  const [bucket, ...rest] = cleaned.split('/');
+  const objectPath = rest.join('/');
+
+  if (!bucket || !objectPath) return url;
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.storage
     .from(bucket)
     .createSignedUrl(objectPath, SIGNED_URL_TTL_SECONDS);
 
-  if (error || !data?.signedUrl) {
-    return url;
-  }
-
+  if (error || !data?.signedUrl) return url;
   return data.signedUrl;
 }
 
 async function downloadToFile(url: string, filePath: string) {
-  const response = await fetch(url);
-  if (!response.ok || !response.body) {
-    throw new Error('Failed to download the video for transcription.');
+  const res = await fetch(url, { method: 'GET', redirect: 'follow' });
+  if (!res.ok || !res.body) {
+    throw new Error(`Failed to download video. Status: ${res.status}`);
   }
 
-  const stream = Readable.fromWeb(response.body as ReadableStream);
+  const stream = Readable.fromWeb(res.body as ReadableStream);
   await pipeline(stream, createWriteStream(filePath));
 }
 
-async function extractAudio(inputPath: string, outputPath: string) {
-  if (!ffmpegPath) {
-    throw new Error('ffmpeg binary not available.');
-  }
+async function extractMp3(inputMp4: string, outputMp3: string) {
+  if (!ffmpegPath) throw new Error('ffmpeg binary not available.');
 
   await new Promise<void>((resolve, reject) => {
-    const ffmpeg = spawn(
+    const p = spawn(
       ffmpegPath,
       [
+        '-y',
         '-i',
-        inputPath,
+        inputMp4,
+        '-t',
+        '75', // safety (your videos are ~60s)
         '-vn',
         '-acodec',
         'mp3',
@@ -118,67 +100,78 @@ async function extractAudio(inputPath: string, outputPath: string) {
         '44100',
         '-ac',
         '2',
-        outputPath,
+        outputMp3,
       ],
       { stdio: 'ignore' }
     );
 
-    ffmpeg.on('error', (error) => reject(error));
-    ffmpeg.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error('Failed to extract audio from video.'));
-      }
+    p.on('error', reject);
+    p.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error('Failed to extract audio from video (ffmpeg).'));
     });
   });
 }
 
-export async function getTranscript(videoUrl: string): Promise<string> {
-  if (!videoUrl) {
-    throw new Error('Video URL is required for transcription.');
+async function transcribeAudio(mp3Path: string): Promise<string> {
+  // 1) Prefer OpenAI if key exists (most reliable for audio)
+  if (openai) {
+    const res = await openai.audio.transcriptions.create({
+      file: createReadStream(mp3Path),
+      model: 'whisper-1',
+      response_format: 'text',
+    });
+
+    const text = asTranscriptText(res);
+    if (text) return text;
+    throw new Error('OpenAI transcription returned empty text.');
   }
 
-  const tempId = randomUUID();
-  const videoPath = path.join(tmpdir(), `${tempId}.mp4`);
-  const audioPath = path.join(tmpdir(), `${tempId}.mp3`);
+  // 2) Try OpenRouter (may be blocked/405 depending on plan/provider)
+  try {
+    const res = await openrouter.audio.transcriptions.create({
+      file: createReadStream(mp3Path),
+      model: 'openai/whisper-1',
+      response_format: 'text',
+    });
+
+    const text = asTranscriptText(res);
+    if (text) return text;
+
+    throw new Error('OpenRouter transcription returned empty text.');
+  } catch (err: any) {
+    const status = typeof err?.status === 'number' ? err.status : undefined;
+
+    if (status === 405) {
+      throw new Error(
+        'OpenRouter transcription is not available on your current setup. Add OPENAI_API_KEY to enable transcription.'
+      );
+    }
+
+    throw new Error('Transcription request failed.');
+  }
+}
+
+/* ----------------------------- Actions ----------------------------- */
+
+export async function getTranscript(videoUrl: string): Promise<string> {
+  if (!videoUrl || !isHttpUrl(videoUrl)) {
+    throw new Error('Valid video URL is required for transcription.');
+  }
+
+  const id = randomUUID();
+  const videoPath = path.join(tmpdir(), `${id}.mp4`);
+  const audioPath = path.join(tmpdir(), `${id}.mp3`);
 
   try {
     const signedUrl = await maybeCreateSignedSupabaseUrl(videoUrl);
     await downloadToFile(signedUrl, videoPath);
-    await extractAudio(videoPath, audioPath);
+    await extractMp3(videoPath, audioPath);
 
-    const transcription = await createTranscription(audioPath);
+    const text = (await transcribeAudio(audioPath)).trim();
+    if (!text) throw new Error('Transcription returned no text.');
 
-    const rawText =
-      typeof transcription === 'string'
-        ? transcription
-        : transcription.text ?? transcription.transcription;
-    const transcriptText = String(rawText ?? '').trim();
-
-    if (!transcriptText) {
-      throw new Error('Transcription service returned no text.');
-    }
-
-    return transcriptText;
-  } catch (error) {
-    console.error(error);
-    const status =
-      typeof (error as { status?: number }).status === 'number'
-        ? (error as { status: number }).status
-        : undefined;
-    const friendlyMessage =
-      status === 401 || status === 403
-        ? 'Transcription service authentication failed.'
-        : status === 400
-          ? 'Transcription request was invalid.'
-          : status === 405
-            ? 'Transcription service rejected the request.'
-            : 'Failed to extract the transcript.';
-    if (error instanceof Error) {
-      throw new Error(friendlyMessage, { cause: error });
-    }
-    throw new Error(friendlyMessage, { cause: error });
+    return text;
   } finally {
     await Promise.all([
       unlink(videoPath).catch(() => undefined),
@@ -191,46 +184,43 @@ export async function getOrCreateTranscript(
   videoId: string,
   videoUrl: string
 ): Promise<string> {
-  if (!videoId) {
-    throw new Error('Video ID is required for transcription.');
-  }
-  if (!videoUrl) {
-    throw new Error('Video URL is required for transcription.');
-  }
+  if (!videoId) throw new Error('videoId is required.');
+  if (!videoUrl) throw new Error('videoUrl is required.');
 
   const supabase = await createSupabaseServerClient();
+
+  // read existing
   const { data, error } = await supabase
     .from('videos')
     .select('transcript')
     .eq('id', videoId)
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    throw new Error('Failed to load transcript for this video.');
-  }
+  if (error) throw new Error('Failed to load transcript.');
 
-  const existingTranscript =
+  const existing =
     typeof data?.transcript === 'string' ? data.transcript.trim() : '';
-  if (existingTranscript) {
-    return existingTranscript;
-  }
+  if (existing) return existing;
 
-  const transcriptText = (await getTranscript(videoUrl)).trim();
-  if (!transcriptText) {
-    throw new Error('Transcription service returned no text.');
-  }
+  // generate once
+  const generated = (await getTranscript(videoUrl)).trim();
+  if (!generated) throw new Error('Transcription returned no text.');
 
+  // save (DB already set in your project)
   const { error: updateError } = await supabase
     .from('videos')
-    .update({ transcript: transcriptText })
+    .update({ transcript: generated })
     .eq('id', videoId);
 
   if (updateError) {
-    throw new Error('Failed to save transcript for this video.');
+    // still return generated, but signal save issue
+    throw new Error('Transcript generated but failed to save.');
   }
 
-  return transcriptText;
+  return generated;
 }
+
+/* -------------------- keep other actions as-is -------------------- */
 
 export async function getAnswer(
   videoTitle: string,
@@ -277,10 +267,10 @@ export async function getRecommendations(
     ],
     response_format: { type: 'json_object' },
   });
+
   const textResponse = completion.choices[0].message.content;
-  if (!textResponse) {
-    throw new Error('No response from AI');
-  }
+  if (!textResponse) throw new Error('No response from AI');
+
   try {
     const jsonResponse = JSON.parse(textResponse);
     return jsonResponse.recommendations || [];
