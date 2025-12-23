@@ -6,14 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Download, FileText, Loader2 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
-import { getTranscript } from '@/app/actions';
+import { getOrCreateTranscript } from '@/app/actions';
 
 interface VideoTranscriptProps {
   video: Video;
 }
 
 export function VideoTranscript({ video }: VideoTranscriptProps) {
-  const [transcript, setTranscript] = useState('');
+  const [transcript, setTranscript] = useState(() =>
+    typeof video.transcript === 'string' ? video.transcript.trim() : ''
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
