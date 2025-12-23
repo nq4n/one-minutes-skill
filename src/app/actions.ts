@@ -127,9 +127,9 @@ export async function getTranscript(videoUrl: string): Promise<string> {
   } catch (error) {
     console.error(error);
     if (error instanceof Error) {
-      throw new Error(error.message);
+      throw new Error(error.message, { cause: error });
     }
-    throw new Error('Failed to extract the transcript.');
+    throw new Error('Failed to extract the transcript.', { cause: error });
   } finally {
     await Promise.all([
       unlink(videoPath).catch(() => undefined),
