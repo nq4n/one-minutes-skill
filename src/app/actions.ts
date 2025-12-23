@@ -93,7 +93,7 @@ async function extractAudio(inputPath: string, outputPath: string) {
   });
 }
 
-export async function getTranscript(videoUrl: string) {
+export async function getTranscript(videoUrl: string): Promise<string> {
   if (!videoUrl) {
     throw new Error('Video URL is required for transcription.');
   }
@@ -113,23 +113,74 @@ export async function getTranscript(videoUrl: string) {
       response_format: 'text',
     });
 
-    if (!transcription.text) {
+    const rawText =
+      typeof transcription === 'string'
+        ? transcription
+        : transcription.text ?? transcription.transcription;
+    const transcriptText = String(rawText ?? '').trim();
+
+    if (!transcriptText) {
       throw new Error('Transcription service returned no text.');
     }
 
-    return transcription.text;
+    return transcriptText;
   } catch (error) {
     console.error(error);
     if (error instanceof Error) {
-      throw new Error(error.message);
+      throw new Error(error.message, { cause: error });
     }
-    throw new Error('Failed to extract the transcript.');
+    throw new Error('Failed to extract the transcript.', { cause: error });
   } finally {
     await Promise.all([
       unlink(videoPath).catch(() => undefined),
       unlink(audioPath).catch(() => undefined),
     ]);
   }
+}
+
+export async function getOrCreateTranscript(
+  videoId: string,
+  videoUrl: string
+): Promise<string> {
+  if (!videoId) {
+    throw new Error('Video ID is required for transcription.');
+  }
+  if (!videoUrl) {
+    throw new Error('Video URL is required for transcription.');
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from('videos')
+    .select('transcript')
+    .eq('id', videoId)
+    .single();
+
+  if (error) {
+    throw new Error('Failed to load transcript for this video.');
+  }
+
+  const existingTranscript =
+    typeof data?.transcript === 'string' ? data.transcript.trim() : '';
+  if (existingTranscript) {
+    return existingTranscript;
+  }
+
+  const transcriptText = (await getTranscript(videoUrl)).trim();
+  if (!transcriptText) {
+    throw new Error('Transcription service returned no text.');
+  }
+
+  const { error: updateError } = await supabase
+    .from('videos')
+    .update({ transcript: transcriptText })
+    .eq('id', videoId);
+
+  if (updateError) {
+    throw new Error('Failed to save transcript for this video.');
+  }
+
+  return transcriptText;
 }
 
 export async function getAnswer(
