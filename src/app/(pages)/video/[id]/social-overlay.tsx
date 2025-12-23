@@ -30,6 +30,10 @@ export default function SocialOverlay({
   const [open, setOpen] = useState<Section>(null)
   const [visible, setVisible] = useState(true)
   const [likesCount, setLikesCount] = useState(video.likes); // State for likes
+  const transcriptVideo = {
+    ...video,
+    transcript: typeof video.transcript === 'string' ? video.transcript : '',
+  };
 
   const handleDownload = async () => {
     if (!video.videoUrl) return;
@@ -163,7 +167,7 @@ export default function SocialOverlay({
           <CommentSection comments={comments} />
         )}
         {open === 'transcript' && (
-          <VideoTranscript video={video} />
+          <VideoTranscript video={transcriptVideo} />
         )}
       </div>
     </>
