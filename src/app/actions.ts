@@ -11,8 +11,35 @@ import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
 import { spawn } from 'child_process';
 import ffmpegPath from 'ffmpeg-static';
+import OpenAI from 'openai';
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const openaiFallback = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+async function createTranscription(filePath: string) {
+  try {
+    return await openrouter.audio.transcriptions.create({
+      file: createReadStream(filePath),
+      model: 'openai/whisper-1',
+      response_format: 'text',
+    });
+  } catch (error) {
+    const status =
+      typeof (error as { status?: number }).status === 'number'
+        ? (error as { status: number }).status
+        : undefined;
+    if (status === 405 && openaiFallback) {
+      return await openaiFallback.audio.transcriptions.create({
+        file: createReadStream(filePath),
+        model: 'whisper-1',
+        response_format: 'text',
+      });
+    }
+    throw error;
+  }
+}
 
 async function maybeCreateSignedSupabaseUrl(url: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -107,11 +134,7 @@ export async function getTranscript(videoUrl: string): Promise<string> {
     await downloadToFile(signedUrl, videoPath);
     await extractAudio(videoPath, audioPath);
 
-    const transcription = await openrouter.audio.transcriptions.create({
-      file: createReadStream(audioPath),
-      model: 'openai/whisper-1',
-      response_format: 'text',
-    });
+    const transcription = await createTranscription(audioPath);
 
     const rawText =
       typeof transcription === 'string'
