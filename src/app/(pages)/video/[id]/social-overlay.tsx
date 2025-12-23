@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
   Heart,
   Bookmark,
@@ -9,6 +10,7 @@ import {
   MessageCircle,
   FileText,
   Bot,
+  ArrowLeft,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { VideoChat } from '@/components/video-chat'
@@ -84,6 +86,16 @@ export default function SocialOverlay({
         className="absolute inset-0 z-20"
       />
 
+      <div className="absolute left-4 top-4 z-40">
+        <Link
+          href="/"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white transition hover:scale-105"
+          aria-label="Back to home"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+      </div>
+
       {/* RIGHT ICON STACK (ANIMATED) */}
       <div
         className={`absolute right-4 bottom-28 z-40 flex flex-col items-center gap-4
@@ -92,14 +104,27 @@ export default function SocialOverlay({
         `}
       >
         {/* PROFILE */}
-        <Avatar className="h-12 w-12 border-2 border-white">
-          {creator?.avatarUrl && (
-            <AvatarImage src={creator.avatarUrl} alt={creator.name} />
-          )}
-          <AvatarFallback>
-            {creator?.name?.[0] ?? 'U'}
-          </AvatarFallback>
-        </Avatar>
+        {creator?.id ? (
+          <Link href={`/profile/${creator.id}`} aria-label="View profile">
+            <Avatar className="h-12 w-12 border-2 border-white">
+              {creator?.avatarUrl && (
+                <AvatarImage src={creator.avatarUrl} alt={creator.name} />
+              )}
+              <AvatarFallback>
+                {creator?.name?.[0] ?? 'U'}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
+        ) : (
+          <Avatar className="h-12 w-12 border-2 border-white">
+            {creator?.avatarUrl && (
+              <AvatarImage src={creator.avatarUrl} alt={creator.name} />
+            )}
+            <AvatarFallback>
+              {creator?.name?.[0] ?? 'U'}
+            </AvatarFallback>
+          </Avatar>
+        )}
 
         {/* LIKE */}
         <Icon onClick={handleLike}>

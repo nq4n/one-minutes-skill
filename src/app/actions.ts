@@ -22,8 +22,6 @@ export async function getTranscript(videoId: string): Promise<string> {
   return typeof data?.transcript === 'string' ? data.transcript.trim() : '';
 }
 
-/* -------------------- keep other actions as-is -------------------- */
-
 export async function getAnswer(
   videoTitle: string,
   videoDescription: string,

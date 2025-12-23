@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Download, FileText, Loader2 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
-import { getOrCreateTranscript } from '@/app/actions';
 
 interface VideoTranscriptProps {
   video: Video;
@@ -36,6 +35,7 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
         throw new Error('Video is not available for transcription.');
       }
 
+      const { getTranscript } = await import('@/app/actions');
       const transcription = await getTranscript(video.id);
       setTranscript(transcription);
       setStatus(null);
