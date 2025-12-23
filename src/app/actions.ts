@@ -22,46 +22,6 @@ export async function getTranscript(videoId: string): Promise<string> {
   return typeof data?.transcript === 'string' ? data.transcript.trim() : '';
 }
 
-export async function getOrCreateTranscript(
-  videoId: string,
-  videoUrl: string
-): Promise<string> {
-  if (!videoId) throw new Error('videoId is required.');
-  if (!videoUrl) throw new Error('videoUrl is required.');
-
-  const supabase = await createSupabaseServerClient();
-
-  // read existing
-  const { data, error } = await supabase
-    .from('videos')
-    .select('transcript')
-    .eq('id', videoId)
-    .maybeSingle();
-
-  if (error) throw new Error('Failed to load transcript.');
-
-  const existing =
-    typeof data?.transcript === 'string' ? data.transcript.trim() : '';
-  if (existing) return existing;
-
-  // generate once
-  const generated = (await getTranscript(videoUrl)).trim();
-  if (!generated) throw new Error('Transcription returned no text.');
-
-  // save (DB already set in your project)
-  const { error: updateError } = await supabase
-    .from('videos')
-    .update({ transcript: generated })
-    .eq('id', videoId);
-
-  if (updateError) {
-    // still return generated, but signal save issue
-    throw new Error('Transcript generated but failed to save.');
-  }
-
-  return generated;
-}
-
 /* -------------------- keep other actions as-is -------------------- */
 
 export async function getAnswer(

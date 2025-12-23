@@ -162,13 +162,15 @@ export default function SocialOverlay({
         `}
         style={{ maxHeight: '45%' }}
       >
-        {open === 'chat' && <VideoChat video={video} />}
-        {open === 'comments' && (
-          <CommentSection comments={comments} />
-        )}
-        {open === 'transcript' && (
-          <VideoTranscript video={transcriptVideo} />
-        )}
+        <div className="h-full max-h-full overflow-y-auto p-4">
+          {open === 'chat' && <VideoChat video={video} />}
+          {open === 'comments' && (
+            <CommentSection videoId={video.id} comments={comments} />
+          )}
+          {open === 'transcript' && (
+            <VideoTranscript video={transcriptVideo} />
+          )}
+        </div>
       </div>
     </>
   )
