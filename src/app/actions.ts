@@ -14,11 +14,24 @@ import ffmpegPath from 'ffmpeg-static';
 import OpenAI from 'openai';
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
-const openaiFallback = process.env.OPENAI_API_KEY
+const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
 async function createTranscription(filePath: string) {
+  let openaiError: unknown;
+  if (openaiClient) {
+    try {
+      return await openaiClient.audio.transcriptions.create({
+        file: createReadStream(filePath),
+        model: 'whisper-1',
+        response_format: 'text',
+      });
+    } catch (error) {
+      openaiError = error;
+    }
+  }
+
   try {
     return await openrouter.audio.transcriptions.create({
       file: createReadStream(filePath),
@@ -30,20 +43,15 @@ async function createTranscription(filePath: string) {
       typeof (error as { status?: number }).status === 'number'
         ? (error as { status: number }).status
         : undefined;
-    if (openaiFallback) {
-      try {
-        return await openaiFallback.audio.transcriptions.create({
-          file: createReadStream(filePath),
-          model: 'whisper-1',
-          response_format: 'text',
-        });
-      } catch (fallbackError) {
-        throw new Error('Transcription request failed.', {
-          cause: fallbackError,
-        });
-      }
+    if (!openaiClient && status === 405) {
+      throw new Error(
+        'Transcription is unavailable with OpenRouter. Set OPENAI_API_KEY to enable transcription.',
+        { cause: error }
+      );
     }
-    throw error;
+    throw new Error('Transcription request failed.', {
+      cause: openaiError ?? error,
+    });
   }
 }
 
