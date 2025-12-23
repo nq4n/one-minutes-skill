@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Video } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,7 +17,6 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const statusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const transcriptFileName = useMemo(() => {
     const safeTitle = video.title?.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
@@ -28,14 +27,14 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
     setIsLoading(true);
     setError(null);
     setTranscript('');
-    setStatus('Downloading on server...');
+    setStatus('Loading transcript...');
 
     try {
-      if (!video.videoUrl) {
-        throw new Error('Video source is not available for transcription.');
+      if (!video.id) {
+        throw new Error('Video is not available for transcription.');
       }
 
-      const transcription = await getTranscript(video.videoUrl);
+      const transcription = await getTranscript(video.id);
       setTranscript(transcription);
       setStatus(null);
     } catch (e) {
@@ -43,7 +42,7 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
       setError(
         e instanceof Error
           ? e.message
-          : 'Failed to extract the transcript. Please try again.'
+          : 'Failed to load the transcript. Please try again.'
       );
       setStatus(null);
     } finally {
@@ -52,33 +51,13 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
   };
 
   useEffect(() => {
-    if (!isLoading) {
-      if (statusIntervalRef.current) {
-        clearInterval(statusIntervalRef.current);
-        statusIntervalRef.current = null;
-      }
-      return;
-    }
-
-    const steps = [
-      'Downloading on server...',
-      'Extracting audio...',
-      'Transcribing...',
-    ];
-    let index = 0;
-    setStatus(steps[index]);
-    statusIntervalRef.current = setInterval(() => {
-      index = (index + 1) % steps.length;
-      setStatus(steps[index]);
-    }, 3500);
-
-    return () => {
-      if (statusIntervalRef.current) {
-        clearInterval(statusIntervalRef.current);
-        statusIntervalRef.current = null;
-      }
-    };
-  }, [isLoading]);
+    setTranscript(
+      typeof video.transcript === 'string' ? video.transcript.trim() : ''
+    );
+    setIsLoading(false);
+    setError(null);
+    setStatus(null);
+  }, [video.id, video.transcript]);
 
   const handleDownloadTranscript = () => {
     const blob = new Blob([transcript], { type: 'text/plain;charset=utf-8' });
@@ -115,22 +94,22 @@ export function VideoTranscript({ video }: VideoTranscriptProps) {
               <FileText className="h-8 w-8 text-primary" />
             </div>
             <h3 className="font-headline text-lg font-semibold">
-              Generate Video Transcript
+              Load Video Transcript
             </h3>
             <p className="mb-4 text-muted-foreground">
-              Extract a transcript directly from the video audio.
+              Fetch the transcript that is stored for this video.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Button onClick={handleGenerateTranscript} disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Extracting...
+                    Loading...
                   </>
                 ) : (
                   <>
                     <FileText className="mr-2 h-4 w-4" />
-                    Extract Transcript
+                    Load Transcript
                   </>
                 )}
               </Button>
