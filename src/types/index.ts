@@ -17,6 +17,7 @@ export interface Video {
   thumbnailUrl: string;
   video_url: string;
   videoUrl: string;
+  transcript?: string;
   contributor_id: string;
   category_id: string;
   views: number;
