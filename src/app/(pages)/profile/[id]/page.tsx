@@ -6,24 +6,22 @@ import { notFound } from 'next/navigation';
 import { User } from 'lucide-react';
 import { VideoChat } from '@/components/video-chat';
 import { Separator } from '@/components/ui/separator';
-import { cookies } from 'next/headers';
-
 interface ProfilePageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function ProfilePage({ params }: ProfilePageProps) {
-  const cookieStore = await cookies();
   try {
-    const contributor = await getContributorById(cookieStore, params.id);
+    const { id } = await params;
+    const contributor = await getContributorById(id);
     
     if (!contributor) {
       notFound();
     }
 
-    const contributorVideos = await getVideosByContributor(cookieStore, contributor.id);
+    const contributorVideos = await getVideosByContributor(contributor.id);
 
     return (
         <main className="flex-1 p-4 md:p-6 lg:p-8">
