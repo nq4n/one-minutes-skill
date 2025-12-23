@@ -1,7 +1,7 @@
 // src/app/(pages)/video/[id]/social-overlay.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
   Heart,
@@ -17,6 +17,7 @@ import { VideoChat } from '@/components/video-chat'
 import { CommentSection } from '@/components/comment-section'
 import { VideoTranscript } from '@/components/video-transcript'
 import { supabase } from '@/lib/supabase/client'; // Import Supabase client
+import { toggleBookmark } from './actions'
 
 type Section = 'chat' | 'comments' | 'transcript' | null
 
@@ -24,14 +25,21 @@ export default function SocialOverlay({
   video,
   comments,
   creator,
+  isBookmarked: initialIsBookmarked,
+  isAuthenticated,
 }: {
   video: any
   comments: any[]
   creator: any
+  isBookmarked: boolean
+  isAuthenticated: boolean
 }) {
   const [open, setOpen] = useState<Section>(null)
   const [visible, setVisible] = useState(true)
   const [likesCount, setLikesCount] = useState(video.likes); // State for likes
+  const [isBookmarked, setIsBookmarked] = useState(initialIsBookmarked)
+  const [bookmarkMessage, setBookmarkMessage] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
   const transcriptVideo = {
     ...video,
     transcript: typeof video.transcript === 'string' ? video.transcript : '',
@@ -77,6 +85,29 @@ export default function SocialOverlay({
     }
   };
 
+  const handleBookmark = () => {
+    if (!isAuthenticated) {
+      setBookmarkMessage('Login required to bookmark.');
+      return
+    }
+
+    setBookmarkMessage(null)
+    startTransition(async () => {
+      try {
+        const result = await toggleBookmark(video.id)
+        if (result?.error === 'LOGIN_REQUIRED') {
+          setBookmarkMessage('Login required to bookmark.')
+          setIsBookmarked(false)
+          return
+        }
+        setIsBookmarked(Boolean(result?.isBookmarked))
+      } catch (error) {
+        console.error('Error toggling bookmark:', error)
+        setBookmarkMessage('Unable to update bookmark.')
+      }
+    })
+  }
+
   return (
     <>
       {/* INTERACTION LAYER (SHOW CONTROLS ON MOVE) */}
@@ -94,6 +125,17 @@ export default function SocialOverlay({
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
+      </div>
+
+      <div className="absolute left-4 top-16 right-20 z-40 text-white">
+        <h1 className="text-lg font-semibold leading-tight sm:text-xl">
+          {video.title}
+        </h1>
+        {video.description && (
+          <p className="mt-1 text-xs text-white/80 sm:text-sm">
+            {video.description}
+          </p>
+        )}
       </div>
 
       {/* RIGHT ICON STACK (ANIMATED) */}
@@ -135,9 +177,25 @@ export default function SocialOverlay({
         </Icon>
 
         {/* SAVE */}
-        <Icon>
-          <Bookmark />
+        <Icon
+          onClick={handleBookmark}
+          active={isBookmarked}
+          disabled={!isAuthenticated || isPending}
+          title={
+            !isAuthenticated
+              ? 'Login required to bookmark'
+              : isBookmarked
+                ? 'Remove bookmark'
+                : 'Save bookmark'
+          }
+        >
+          <Bookmark className={isBookmarked ? 'fill-current' : undefined} />
         </Icon>
+        {bookmarkMessage && (
+          <span className="text-[10px] text-white/80 text-center max-w-[72px]">
+            {bookmarkMessage}
+          </span>
+        )}
 
         {/* DOWNLOAD */}
         <Icon onClick={handleDownload}>
@@ -205,17 +263,24 @@ function Icon({
   children,
   onClick,
   active,
+  disabled,
+  title,
 }: {
   children: React.ReactNode
   onClick?: () => void
   active?: boolean
+  disabled?: boolean
+  title?: string
 }) {
   return (
     <button
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={title}
       className={`h-12 w-12 rounded-full flex items-center justify-center
       backdrop-blur transition-all duration-200
       ${active ? 'bg-white text-black scale-105' : 'bg-black/60 text-white hover:scale-105'}
+      ${disabled ? 'cursor-not-allowed opacity-60 hover:scale-100' : ''}
       `}
     >
       {children}
