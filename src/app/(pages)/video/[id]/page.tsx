@@ -2,19 +2,13 @@
 import { notFound } from 'next/navigation'
 import { getVideoById, getContributorById } from '@/lib/db/server'
 import { VideoPlayer } from '@/components/video-player'
-import SocialOverlay from './social-overlay'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CommentSection } from '@/components/comment-section'
-import { VideoChat } from '@/components/video-chat'
-import { VideoTranscript } from '@/components/video-transcript'
-import { ViewTracker } from '@/components/view-tracker'
 import VideoInteractionWrapper from './video-interaction-wrapper'
 export default async function VideoPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
-  const { id } = await params
+  const { id } = params
   const video = await getVideoById(id)
   if (!video) notFound()
 
@@ -31,7 +25,6 @@ export default async function VideoPage({
             creator={creator}
           />
         </div>
-
         <div className="mt-4">
           <h1 className="text-xl font-bold">{video.title}</h1>
           {video.description && (
@@ -39,23 +32,6 @@ export default async function VideoPage({
               {video.description}
             </p>
           )}
-
-          <Tabs defaultValue="comments" className="mt-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="comments">Comments</TabsTrigger>
-              <TabsTrigger value="chat">Chat</TabsTrigger>
-              <TabsTrigger value="transcript">Transcript</TabsTrigger>
-            </TabsList>
-            <TabsContent value="comments">
-              <CommentSection comments={video.comments || []} />
-            </TabsContent>
-            <TabsContent value="chat">
-              <VideoChat video={video} />
-            </TabsContent>
-            <TabsContent value="transcript">
-              <VideoTranscript video={video} />
-            </TabsContent>
-          </Tabs>
         </div>
       </div>
     </main>

@@ -30,6 +30,10 @@ export default function SocialOverlay({
   const [open, setOpen] = useState<Section>(null)
   const [visible, setVisible] = useState(true)
   const [likesCount, setLikesCount] = useState(video.likes); // State for likes
+  const transcriptVideo = {
+    ...video,
+    transcript: typeof video.transcript === 'string' ? video.transcript : '',
+  };
 
   const handleDownload = async () => {
     if (!video.videoUrl) return;
@@ -158,13 +162,15 @@ export default function SocialOverlay({
         `}
         style={{ maxHeight: '45%' }}
       >
-        {open === 'chat' && <VideoChat video={video} />}
-        {open === 'comments' && (
-          <CommentSection comments={comments} />
-        )}
-        {open === 'transcript' && (
-          <VideoTranscript video={video} />
-        )}
+        <div className="h-full max-h-full overflow-y-auto p-4">
+          {open === 'chat' && <VideoChat video={video} />}
+          {open === 'comments' && (
+            <CommentSection videoId={video.id} comments={comments} />
+          )}
+          {open === 'transcript' && (
+            <VideoTranscript video={transcriptVideo} />
+          )}
+        </div>
       </div>
     </>
   )
