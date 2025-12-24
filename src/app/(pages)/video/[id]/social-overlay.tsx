@@ -16,8 +16,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { VideoChat } from '@/components/video-chat'
 import { CommentSection } from '@/components/comment-section'
 import { VideoTranscript } from '@/components/video-transcript'
-import { supabase } from '@/lib/supabase/client'; // Import Supabase client
-import { toggleBookmark } from './actions'
+import { supabase } from '@/lib/supabase/client' // Import Supabase client
+import { toggleBookmark } from '@/app/actions'
+import { useAuth } from '@/hooks/use-auth'
+import { useToast } from '@/hooks/use-toast'
 
 type Section = 'chat' | 'comments' | 'transcript' | null
 
@@ -26,48 +28,48 @@ export default function SocialOverlay({
   comments,
   creator,
   isBookmarked: initialIsBookmarked,
-  isAuthenticated,
 }: {
   video: any
   comments: any[]
   creator: any
   isBookmarked: boolean
-  isAuthenticated: boolean
 }) {
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const isAuthenticated = Boolean(user)
   const [open, setOpen] = useState<Section>(null)
   const [visible, setVisible] = useState(true)
-  const [likesCount, setLikesCount] = useState(video.likes); // State for likes
+  const [likesCount, setLikesCount] = useState(video.likes) // State for likes
   const [isBookmarked, setIsBookmarked] = useState(initialIsBookmarked)
-  const [bookmarkMessage, setBookmarkMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const transcriptVideo = {
     ...video,
     transcript: typeof video.transcript === 'string' ? video.transcript : '',
-  };
+  }
 
   const handleDownload = async () => {
-    if (!video.videoUrl) return;
+    if (!video.videoUrl) return
 
     try {
-      const response = await fetch(video.videoUrl);
+      const response = await fetch(video.videoUrl)
       if (!response.ok) {
-        throw new Error('Failed to download video.');
+        throw new Error('Failed to download video.')
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${video.title || 'video'}.mp4`;
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${video.title || 'video'}.mp4`
+      link.rel = 'noopener noreferrer'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('Error downloading video:', error);
+      console.error('Error downloading video:', error)
     }
-  };
+  }
 
   // AUTO HIDE CONTROLS WITH FADE
   useEffect(() => {
@@ -77,33 +79,50 @@ export default function SocialOverlay({
   }, [open])
 
   const handleLike = async () => {
-    const { error } = await supabase.rpc('increment_video_likes', { video_id: video.id });
+    const { error } = await supabase.rpc('increment_video_likes', {
+      video_id: video.id,
+    })
     if (!error) {
-      setLikesCount(prev => prev + 1);
+      setLikesCount(prev => prev + 1)
     } else {
-      console.error('Error incrementing likes:', error);
+      console.error('Error incrementing likes:', error)
     }
-  };
+  }
 
   const handleBookmark = () => {
     if (!isAuthenticated) {
-      setBookmarkMessage('Login required to bookmark.');
+      toast({
+        description: 'Login required to bookmark.',
+        variant: 'destructive',
+      })
       return
     }
 
-    setBookmarkMessage(null)
     startTransition(async () => {
       try {
         const result = await toggleBookmark(video.id)
-        if (result?.error === 'LOGIN_REQUIRED') {
-          setBookmarkMessage('Login required to bookmark.')
+        if (result?.error) {
+          if (result.error === 'LOGIN_REQUIRED') {
+            toast({
+              description: 'Login required to bookmark.',
+              variant: 'destructive',
+            })
+          } else {
+            toast({
+              description: 'Something went wrong.',
+              variant: 'destructive',
+            })
+          }
           setIsBookmarked(false)
           return
         }
         setIsBookmarked(Boolean(result?.isBookmarked))
       } catch (error) {
         console.error('Error toggling bookmark:', error)
-        setBookmarkMessage('Unable to update bookmark.')
+        toast({
+          description: 'Unable to update bookmark.',
+          variant: 'destructive',
+        })
       }
     })
   }
@@ -142,7 +161,11 @@ export default function SocialOverlay({
       <div
         className={`absolute right-4 bottom-28 z-40 flex flex-col items-center gap-4
         transition-all duration-300 ease-out
-        ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}
+        ${
+          visible
+            ? 'opacity-100 translate-y-0'
+            : 'opacity-0 translate-y-4 pointer-events-none'
+        }
         `}
       >
         {/* PROFILE */}
@@ -152,9 +175,7 @@ export default function SocialOverlay({
               {creator?.avatarUrl && (
                 <AvatarImage src={creator.avatarUrl} alt={creator.name} />
               )}
-              <AvatarFallback>
-                {creator?.name?.[0] ?? 'U'}
-              </AvatarFallback>
+              <AvatarFallback>{creator?.name?.[0] ?? 'U'}</AvatarFallback>
             </Avatar>
           </Link>
         ) : (
@@ -162,9 +183,7 @@ export default function SocialOverlay({
             {creator?.avatarUrl && (
               <AvatarImage src={creator.avatarUrl} alt={creator.name} />
             )}
-            <AvatarFallback>
-              {creator?.name?.[0] ?? 'U'}
-            </AvatarFallback>
+            <AvatarFallback>{creator?.name?.[0] ?? 'U'}</AvatarFallback>
           </Avatar>
         )}
 
@@ -185,17 +204,12 @@ export default function SocialOverlay({
             !isAuthenticated
               ? 'Login required to bookmark'
               : isBookmarked
-                ? 'Remove bookmark'
-                : 'Save bookmark'
+              ? 'Remove bookmark'
+              : 'Save bookmark'
           }
         >
           <Bookmark className={isBookmarked ? 'fill-current' : undefined} />
         </Icon>
-        {bookmarkMessage && (
-          <span className="text-[10px] text-white/80 text-center max-w-[72px]">
-            {bookmarkMessage}
-          </span>
-        )}
 
         {/* DOWNLOAD */}
         <Icon onClick={handleDownload}>
@@ -219,9 +233,7 @@ export default function SocialOverlay({
         {/* COMMENTS */}
         <Icon
           active={open === 'comments'}
-          onClick={() =>
-            setOpen(open === 'comments' ? null : 'comments')
-          }
+          onClick={() => setOpen(open === 'comments' ? null : 'comments')}
         >
           <MessageCircle />
         </Icon>
@@ -229,9 +241,7 @@ export default function SocialOverlay({
         {/* TRANSCRIPT */}
         <Icon
           active={open === 'transcript'}
-          onClick={() =>
-            setOpen(open === 'transcript' ? null : 'transcript')
-          }
+          onClick={() => setOpen(open === 'transcript' ? null : 'transcript')}
         >
           <FileText />
         </Icon>
@@ -250,9 +260,7 @@ export default function SocialOverlay({
           {open === 'comments' && (
             <CommentSection videoId={video.id} comments={comments} />
           )}
-          {open === 'transcript' && (
-            <VideoTranscript video={transcriptVideo} />
-          )}
+          {open === 'transcript' && <VideoTranscript video={transcriptVideo} />}
         </div>
       </div>
     </>
@@ -279,7 +287,11 @@ function Icon({
       title={title}
       className={`h-12 w-12 rounded-full flex items-center justify-center
       backdrop-blur transition-all duration-200
-      ${active ? 'bg-white text-black scale-105' : 'bg-black/60 text-white hover:scale-105'}
+      ${
+        active
+          ? 'bg-white text-black scale-105'
+          : 'bg-black/60 text-white hover:scale-105'
+      }
       ${disabled ? 'cursor-not-allowed opacity-60 hover:scale-100' : ''}
       `}
     >

@@ -9,13 +9,11 @@ export default function VideoInteractionWrapper({
   comments,
   creator,
   isBookmarked,
-  isAuthenticated,
 }: {
   video: any;
   comments: any[];
   creator: any;
   isBookmarked: boolean;
-  isAuthenticated: boolean;
 }) {
   const [viewsCount, setViewsCount] = useState(video.views);
 
@@ -30,7 +28,6 @@ export default function VideoInteractionWrapper({
         comments={comments}
         creator={creator}
         isBookmarked={isBookmarked}
-        isAuthenticated={isAuthenticated}
       />
       <ViewTracker videoId={video.id} onViewIncrement={handleViewIncrement} />
     </>

@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export async function toggleBookmark(videoId: string) {
@@ -32,7 +33,7 @@ export async function toggleBookmark(videoId: string) {
     if (error) {
       throw new Error('Failed to remove bookmark')
     }
-
+    revalidatePath(`/video/${videoId}`)
     return { isBookmarked: false }
   }
 
@@ -43,6 +44,6 @@ export async function toggleBookmark(videoId: string) {
   if (error) {
     throw new Error('Failed to save bookmark')
   }
-
+  revalidatePath(`/video/${videoId}`)
   return { isBookmarked: true }
 }

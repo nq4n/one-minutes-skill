@@ -37,7 +37,6 @@ export default async function VideoPage({
             comments={video.comments}
             creator={creator}
             isBookmarked={Boolean(bookmark)}
-            isAuthenticated={Boolean(user)}
           />
         </div>
       </div>

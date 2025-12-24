@@ -14,19 +14,10 @@ export async function createSupabaseServerClient() {
         return cookieStore.get(name)?.value
       },
       set(name: string, value: string, options: CookieOptions) {
-        try {
-          cookieStore.set({ name, value, ...options })
-        } catch {
-          // Happens in Server Components (read-only cookies).
-          // It’s OK. In that case, rely on middleware/route handlers for refresh.
-        }
+        cookieStore.set({ name, value, ...options })
       },
       remove(name: string, options: CookieOptions) {
-        try {
-          cookieStore.set({ name, value: '', ...options })
-        } catch {
-          // Same as above
-        }
+        cookieStore.set({ name, value: '', ...options })
       },
     },
   })

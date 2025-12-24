@@ -1,50 +1,73 @@
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Define your protected routes here
-const protectedRoutes = [
-  '/upload', // Example protected route
-  '/settings', // Example protected route
-];
-
 export async function middleware(request: NextRequest) {
-  // We're not doing server-side Supabase session management here for CSR auth strategy.
-  // This middleware's job is purely to redirect if a protected route is accessed directly.
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
 
-  const { pathname } = request.nextUrl;
-
-  // If the path is in the protected routes list
-  if (protectedRoutes.some(route => pathname.startsWith(route))) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const projectRef = supabaseUrl
-      ? new URL(supabaseUrl).hostname.split('.')[0]
-      : null
-    const cookiePrefix = projectRef ? `sb-${projectRef}-auth-token` : null
-    const hasAuthCookie = cookiePrefix
-      ? request.cookies.has(cookiePrefix) ||
-        request.cookies.has(`${cookiePrefix}.0`) ||
-        request.cookies
-          .getAll()
-          .some(cookie => cookie.name.startsWith(cookiePrefix))
-      : request.cookies
-          .getAll()
-          .some(cookie => cookie.name.includes('auth-token'))
-
-    if (!hasAuthCookie) {
-      return NextResponse.redirect(new URL('/login', request.url))
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+        },
+      },
     }
-  }
+  )
 
-  return NextResponse.next()
+  await supabase.auth.getUser()
+
+  return response
 }
 
 export const config = {
   matcher: [
-    // Match protected routes (example)
-    '/profile/:path*',
-    '/upload/:path*',
-    '/settings/:path*',
-    // Exclude API routes and static assets from this middleware if not already handled by Next.js defaults
-    // You might need to adjust this based on your actual route structure
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
     '/((?!api|_next/static|_next/image|favicon.ico|auth|login|signup).*)',
   ],
 }
