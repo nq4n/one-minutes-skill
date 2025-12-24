@@ -3,8 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { openrouter } from '@/lib/ai/openrouter'
 import { createSupabaseServerClient as createSharedSupabaseServerClient } from '@/lib/supabase/server'
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 
 export async function getTranscript(videoId: string): Promise<string> {
   if (!videoId) {
@@ -83,22 +82,27 @@ export async function getRecommendations(
   }
 }
 
-export async function toggleBookmark(videoId: string) {
+export async function toggleBookmark(
+  videoId: string,
+  accessToken: string | null
+) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(
+    if (!accessToken) {
+      return { error: 'LOGIN_REQUIRED', isBookmarked: false }
+    }
+
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: CookieOptions) {
-            cookieStore.set({ name, value, ...options })
-          },
-          remove(name: string, options: CookieOptions) {
-            cookieStore.set({ name, value: '', ...options })
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
           },
         },
       }
@@ -106,9 +110,10 @@ export async function toggleBookmark(videoId: string) {
 
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+      error: userError,
+    } = await supabase.auth.getUser(accessToken)
 
-    if (!user) {
+    if (userError || !user) {
       return { error: 'LOGIN_REQUIRED', isBookmarked: false }
     }
 
