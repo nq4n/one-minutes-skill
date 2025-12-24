@@ -34,9 +34,10 @@ export default function SocialOverlay({
   creator: any
   isBookmarked: boolean
 }) {
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const { toast } = useToast()
   const isAuthenticated = Boolean(user)
+  const isBookmarkDisabled = isLoading || isPending
   const [open, setOpen] = useState<Section>(null)
   const [visible, setVisible] = useState(true)
   const [likesCount, setLikesCount] = useState(video.likes) // State for likes
@@ -90,6 +91,10 @@ export default function SocialOverlay({
   }
 
   const handleBookmark = () => {
+    if (isLoading) {
+      return
+    }
+
     if (!isAuthenticated) {
       toast({
         description: 'Login required to bookmark.',
@@ -199,9 +204,11 @@ export default function SocialOverlay({
         <Icon
           onClick={handleBookmark}
           active={isBookmarked}
-          disabled={!isAuthenticated || isPending}
+          disabled={!isAuthenticated || isBookmarkDisabled}
           title={
-            !isAuthenticated
+            isLoading
+              ? 'Checking login status'
+              : !isAuthenticated
               ? 'Login required to bookmark'
               : isBookmarked
               ? 'Remove bookmark'
