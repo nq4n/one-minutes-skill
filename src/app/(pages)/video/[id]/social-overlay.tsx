@@ -37,12 +37,13 @@ export default function SocialOverlay({
   const { user, session, isLoading } = useAuth()
   const { toast } = useToast()
   const isAuthenticated = Boolean(user)
+  const [isPending, startTransition] = useTransition()
   const isBookmarkDisabled = isLoading || isPending
   const [open, setOpen] = useState<Section>(null)
   const [visible, setVisible] = useState(true)
   const [likesCount, setLikesCount] = useState(video.likes) // State for likes
   const [isBookmarked, setIsBookmarked] = useState(initialIsBookmarked)
-  const [isPending, startTransition] = useTransition()
+  
   const transcriptVideo = {
     ...video,
     transcript: typeof video.transcript === 'string' ? video.transcript : '',
