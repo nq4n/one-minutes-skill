@@ -43,7 +43,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import replacePng from '@/public/replace.png'
-import { getCategories } from '@/lib/db/client'
+import { getCategories, updateContributorProfile } from '@/lib/db/client'
 import { uploadVideo } from '@/lib/video-actions'
 
 interface ProfileClientPageProps {
@@ -67,6 +67,12 @@ export function ProfileClientPage({
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+  const [profile, setProfile] = useState(contributor)
+  const [name, setName] = useState(contributor.name)
+  const [bio, setBio] = useState(contributor.bio)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
   const handleLogout = async () => {
     await signOut()
@@ -76,6 +82,12 @@ export function ProfileClientPage({
   useEffect(() => {
     getCategories().then(setCategories)
   }, [])
+
+  useEffect(() => {
+    setProfile(contributor)
+    setName(contributor.name)
+    setBio(contributor.bio)
+  }, [contributor])
 
   const createThumbnailFromVideo = async (file: File) => {
     const videoElement = document.createElement('video')
@@ -179,6 +191,48 @@ export function ProfileClientPage({
     0
   )
 
+  const handleSaveProfile = async () => {
+    setSaveError(null)
+    setSaveSuccess(null)
+
+    const trimmedName = name.trim()
+    const trimmedBio = bio.trim()
+
+    if (!trimmedName) {
+      setSaveError('Name is required.')
+      return
+    }
+
+    if (
+      trimmedName === profile.name &&
+      trimmedBio === (profile.bio || '')
+    ) {
+      setSaveSuccess('Your profile is already up to date.')
+      return
+    }
+
+    setIsSaving(true)
+
+    const updated = await updateContributorProfile(profile.id, {
+      name: trimmedName,
+      bio: trimmedBio,
+    })
+
+    if (!updated) {
+      setSaveError('Unable to save your changes. Please try again.')
+      setIsSaving(false)
+      return
+    }
+
+    setProfile(updated)
+    setName(updated.name)
+    setBio(updated.bio)
+    setSaveSuccess('Profile updated successfully.')
+    setIsSaving(false)
+  }
+
+  const avatarUrl = profile.avatarUrl || profile.avatar_url
+
   return (
     <div className="flex min-h-screen w-full flex-col">
 
@@ -187,10 +241,10 @@ export function ProfileClientPage({
           {/* PROFILE HEADER */}
           <div className="mb-8 flex flex-col items-center gap-6 md:flex-row md:items-start">
             <Avatar className="h-28 w-28 border-4 border-background shadow-md">
-              {contributor.avatarUrl && (
+              {avatarUrl && (
                 <AvatarImage
-                  src={contributor.avatarUrl}
-                  alt={contributor.name}
+                  src={avatarUrl}
+                  alt={profile.name}
                 />
               )}
               <AvatarFallback>
@@ -200,10 +254,10 @@ export function ProfileClientPage({
 
             <div className="flex-1 text-center md:text-left">
               <h1 className="text-3xl font-bold font-headline">
-                {contributor.name}
+                {profile.name}
               </h1>
               <p className="mt-2 max-w-xl text-muted-foreground">
-                {contributor.bio}
+                {profile.bio}
               </p>
 
               <div className="mt-4 flex justify-center space-x-6 md:justify-start">
@@ -399,16 +453,35 @@ export function ProfileClientPage({
                       </h3>
                       <Separator className="my-2" />
                       <div className="space-y-4">
-                        <div className="grid gap-2">
-                          <Label>Name</Label>
-                          <Input defaultValue={contributor.name} />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label>Bio</Label>
-                          <Input defaultValue={contributor.bio} />
-                        </div>
-                        <Button disabled>Save Changes</Button>
+                      <div className="grid gap-2">
+                        <Label>Name</Label>
+                        <Input
+                          value={name}
+                          onChange={(event) => setName(event.target.value)}
+                          disabled={isSaving}
+                        />
                       </div>
+                      <div className="grid gap-2">
+                        <Label>Bio</Label>
+                        <Input
+                          value={bio}
+                          onChange={(event) => setBio(event.target.value)}
+                          disabled={isSaving}
+                        />
+                      </div>
+                      {saveError && (
+                        <p className="text-sm text-destructive">{saveError}</p>
+                      )}
+                      {saveSuccess && (
+                        <p className="text-sm text-primary">{saveSuccess}</p>
+                      )}
+                      <Button
+                        onClick={handleSaveProfile}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </div>
                     </div>
 
                     <div>

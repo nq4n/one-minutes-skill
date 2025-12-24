@@ -53,6 +53,10 @@ export function VideoCard({ video }: VideoCardProps) {
     return num.toString();
   };
 
+  const contributorAvatar =
+    contributor?.avatarUrl || contributor?.avatar_url || '/replace.png';
+  const contributorName = contributor?.name || 'Creator';
+
   return (
     <Card className="group relative w-full overflow-hidden rounded-xl shadow-lg transition-all hover:shadow-2xl">
       <CardContent className="relative flex h-full min-h-[550px] flex-col p-0">
@@ -80,42 +84,54 @@ export function VideoCard({ video }: VideoCardProps) {
           <Link href={`/video/${video.id}`} className="block">
             <h3 className="font-headline text-lg font-bold">{video.title}</h3>
           </Link>
-          {contributor && (
-            <div className="mt-2 flex items-center justify-between gap-2">
+          <div className="mt-2 flex items-center justify-between gap-2">
+            {contributor?.id ? (
               <Link
                 href={`/profile/${contributor.id}`}
                 className="group/contributor relative z-30 flex-shrink-0"
               >
                 <div className="flex items-center gap-2">
                   <Image
-                    src={contributor.avatarUrl ? contributor.avatarUrl : '/replace.png'}
-                    alt={contributor.name}
+                    src={contributorAvatar}
+                    alt={contributorName}
                     width={24}
                     height={24}
                     className="rounded-full border-2 border-transparent transition-colors group-hover/contributor:border-accent"
                     data-ai-hint="person avatar"
                   />
                   <p className="text-sm font-medium transition-colors group-hover/contributor:text-accent">
-                    {contributor.name}
+                    {contributorName}
                   </p>
                 </div>
               </Link>
-              <div className="flex flex-shrink-0 items-center gap-3 text-sm">
-                <div className="flex items-center gap-1">
-                  <Eye className="h-4 w-4" />
-                  <span>{formatCount(video.views)}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Heart className="h-4 w-4" />
-                  <span>{formatCount(video.likes ?? 0)}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <MessageCircle className="h-4 w-4" />
-                  <span>{formatCount(video.comments?.length || 0)}</span>
-                </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Image
+                  src={contributorAvatar}
+                  alt={contributorName}
+                  width={24}
+                  height={24}
+                  className="rounded-full border-2 border-transparent"
+                  data-ai-hint="person avatar"
+                />
+                <span>{contributorName}</span>
+              </div>
+            )}
+            <div className="flex flex-shrink-0 items-center gap-3 text-sm">
+              <div className="flex items-center gap-1">
+                <Eye className="h-4 w-4" />
+                <span>{formatCount(video.views)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Heart className="h-4 w-4" />
+                <span>{formatCount(video.likes ?? 0)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <MessageCircle className="h-4 w-4" />
+                <span>{formatCount(video.comments?.length || 0)}</span>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </CardContent>
     </Card>

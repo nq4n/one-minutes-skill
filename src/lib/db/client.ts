@@ -132,3 +132,29 @@ export async function getVideosByContributorId(
     comments: video.comments ?? [],
   }))
 }
+
+/* ------------------------------------------------------------------ */
+/* CONTRIBUTORS (PROFILE SETTINGS) */
+/* ------------------------------------------------------------------ */
+
+export async function updateContributorProfile(
+  contributorId: string,
+  updates: { name: string; bio: string }
+): Promise<Contributor | null> {
+  const { data, error } = await supabase
+    .from('contributors')
+    .update({
+      name: updates.name,
+      bio: updates.bio,
+    })
+    .eq('id', contributorId)
+    .select('*')
+    .single()
+
+  if (error || !data) {
+    console.error('updateContributorProfile error:', error)
+    return null
+  }
+
+  return data
+}
