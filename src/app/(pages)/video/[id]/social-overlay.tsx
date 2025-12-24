@@ -34,7 +34,7 @@ export default function SocialOverlay({
   creator: any
   isBookmarked: boolean
 }) {
-  const { user, isLoading } = useAuth()
+  const { user, session, isLoading } = useAuth()
   const { toast } = useToast()
   const isAuthenticated = Boolean(user)
   const isBookmarkDisabled = isLoading || isPending
@@ -105,7 +105,10 @@ export default function SocialOverlay({
 
     startTransition(async () => {
       try {
-        const result = await toggleBookmark(video.id)
+        const result = await toggleBookmark(
+          video.id,
+          session?.access_token ?? null
+        )
         if (result?.error) {
           if (result.error === 'LOGIN_REQUIRED') {
             toast({
