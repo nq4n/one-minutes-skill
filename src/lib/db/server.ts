@@ -92,7 +92,7 @@ export async function getSavedVideos(userId: string): Promise<Video[]> {
   const supabase = await createSupabaseServerClient()
 
   const { data: saved, error: savedError } = await supabase
-    .from("saved_videos")
+    .from("video_bookmarks")
     .select("video_id")
     .eq("user_id", userId)
 
