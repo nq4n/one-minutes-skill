@@ -1,20 +1,16 @@
-
 'use client';
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, Eye, MessageCircle } from 'lucide-react';
+import { Heart, Eye, MessageCircle, User } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useSavedVideos } from '@/hooks/use-saved-videos';
-import type { Video } from '@/types';
+import type { Video, Contributor } from '@/types';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
-import { getContributorById } from '@/lib/db/client'; // CORRECTED IMPORT
+import { getContributorById } from '@/lib/db/client';
 import { useEffect, useState } from 'react';
-import type { Contributor } from '@/types';
-// import replacePng from '@/public/replace.png';
-
 
 interface VideoCardProps {
   video: Video;
@@ -24,11 +20,21 @@ export function VideoCard({ video }: VideoCardProps) {
   const { isSaved, toggleSaveVideo, isLoading } = useSavedVideos();
   const [contributor, setContributor] = useState<Contributor | null>(null);
 
+  // Avatar fallback handling
+  const [avatarError, setAvatarError] = useState(false);
+
   useEffect(() => {
     if (video.contributor_id) {
       getContributorById(video.contributor_id).then(setContributor);
+    } else {
+      setContributor(null);
     }
   }, [video.contributor_id]);
+
+  // Reset avatar error when contributor or avatar url changes
+  useEffect(() => {
+    setAvatarError(false);
+  }, [contributor?.id, contributor?.avatarUrl, contributor?.avatar_url]);
 
   const handleSaveClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -53,9 +59,48 @@ export function VideoCard({ video }: VideoCardProps) {
     return num.toString();
   };
 
-  const contributorAvatar =
-    contributor?.avatarUrl || contributor?.avatar_url || '/replace.png';
+  // Safe avatar src
+  const avatarSrcRaw = (contributor?.avatarUrl || contributor?.avatar_url || '').trim();
+  const avatarSrc =
+    avatarSrcRaw && avatarSrcRaw !== 'null' && avatarSrcRaw !== 'undefined'
+      ? avatarSrcRaw
+      : '';
+
   const contributorName = contributor?.name || 'Creator';
+
+  // Reusable avatar renderer (image or placeholder)
+  const ContributorAvatar = ({ hoverable }: { hoverable?: boolean }) => {
+    const borderHover = hoverable
+      ? 'transition-colors group-hover/contributor:border-accent'
+      : '';
+
+    if (!avatarSrc || avatarError) {
+      return (
+        <span
+          className={cn(
+            'inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-transparent bg-white/15 text-white',
+            borderHover
+          )}
+          aria-label={contributorName}
+          title={contributorName}
+        >
+          <User className="h-4 w-4" />
+        </span>
+      );
+    }
+
+    return (
+      <Image
+        src={avatarSrc}
+        alt={contributorName}
+        width={24}
+        height={24}
+        className={cn('rounded-full border-2 border-transparent', borderHover)}
+        data-ai-hint="person avatar"
+        onError={() => setAvatarError(true)}
+      />
+    );
+  };
 
   return (
     <Card className="group relative w-full overflow-hidden rounded-xl shadow-lg transition-all hover:shadow-2xl">
@@ -69,6 +114,7 @@ export function VideoCard({ video }: VideoCardProps) {
         >
           <Heart className={cn('h-5 w-5', saved && 'fill-accent text-accent')} />
         </Button>
+
         <Link href={`/video/${video.id}`} className="block h-full w-full">
           <Image
             src={video.thumbnailUrl ? video.thumbnailUrl : '/replace.png'}
@@ -79,11 +125,14 @@ export function VideoCard({ video }: VideoCardProps) {
             data-ai-hint={video['data-ai-hint']}
           />
         </Link>
+
         <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
         <div className="absolute bottom-0 z-20 w-full p-4 text-white">
           <Link href={`/video/${video.id}`} className="block">
             <h3 className="font-headline text-lg font-bold">{video.title}</h3>
           </Link>
+
           <div className="mt-2 flex items-center justify-between gap-2">
             {contributor?.id ? (
               <Link
@@ -91,14 +140,7 @@ export function VideoCard({ video }: VideoCardProps) {
                 className="group/contributor relative z-30 flex-shrink-0"
               >
                 <div className="flex items-center gap-2">
-                  <Image
-                    src={contributorAvatar}
-                    alt={contributorName}
-                    width={24}
-                    height={24}
-                    className="rounded-full border-2 border-transparent transition-colors group-hover/contributor:border-accent"
-                    data-ai-hint="person avatar"
-                  />
+                  <ContributorAvatar hoverable />
                   <p className="text-sm font-medium transition-colors group-hover/contributor:text-accent">
                     {contributorName}
                   </p>
@@ -106,17 +148,11 @@ export function VideoCard({ video }: VideoCardProps) {
               </Link>
             ) : (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Image
-                  src={contributorAvatar}
-                  alt={contributorName}
-                  width={24}
-                  height={24}
-                  className="rounded-full border-2 border-transparent"
-                  data-ai-hint="person avatar"
-                />
+                <ContributorAvatar />
                 <span>{contributorName}</span>
               </div>
             )}
+
             <div className="flex flex-shrink-0 items-center gap-3 text-sm">
               <div className="flex items-center gap-1">
                 <Eye className="h-4 w-4" />
